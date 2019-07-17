@@ -117,8 +117,8 @@ print_stats(void)
 	const char clr[] = { 27, '[', '2', 'J', '\0' };
 	const char topLeft[] = { 27, '[', '1', ';', '1', 'H','\0' };
 
-		/* Clear screen and move to top left */
-	printf("%s%s", clr, topLeft);
+	/* Clear screen and move to top left */
+	// printf("%s%s", clr, topLeft);
 
 	printf("\nPort statistics ====================================");
 
@@ -265,6 +265,7 @@ l2fwd_main_loop(void)
 static int
 l2fwd_launch_one_lcore(__attribute__((unused)) void *dummy)
 {
+	printf("l2fwd_launch_one_lcore\n");
 	l2fwd_main_loop();
 	return 0;
 }
