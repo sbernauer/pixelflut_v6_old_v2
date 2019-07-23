@@ -20,7 +20,7 @@ static: build/$(APP)-static
 
 #DEPS = sdl2 libvncserver
 PC_FILE := $(shell pkg-config --path libdpdk sdl2 libvncserver)
-CFLAGS += -O3 $(shell pkg-config --cflags libdpdk sdl2 libvncserver) $(shell pkg-config --cflags $(DEPS))
+CFLAGS += -O3 $(shell pkg-config --cflags libdpdk sdl2 libvncserver)
 LDFLAGS_SHARED = $(shell pkg-config --libs libdpdk sdl2 libvncserver)
 LDFLAGS_STATIC = -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk sdl2 libvncserver)
 
@@ -50,6 +50,10 @@ RTE_TARGET ?= $(notdir $(abspath $(dir $(firstword $(wildcard $(RTE_SDK)/*/.conf
 include $(RTE_SDK)/mk/rte.vars.mk
 
 CFLAGS += $(WERROR_FLAGS)
+PC_FILE := $(shell pkg-config --path sdl2 libvncserver)
+CFLAGS += -O3 $(shell pkg-config --cflags sdl2 libvncserver)
+LDFLAGS +=  $(shell pkg-config --libs sdl2 libvncserver)
+
 
 # workaround for a gcc bug with noreturn attribute
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=12603
