@@ -169,6 +169,7 @@ static void
 l2fwd_main_loop(void)
 {
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
+	struct rte_mbuf *pkts_read[MAX_PKT_BURST];
 	struct rte_mbuf *m;
 	int sent;
 	unsigned lcore_id;
@@ -200,7 +201,103 @@ l2fwd_main_loop(void)
 
 	}
 
+    struct ether_hdr *eth_hdr;
+    struct ipv6_hdr *ipv6_hdr;
+
+    struct ether_addr daddr;
+    daddr.addr_bytes[0] = 0xf8;
+    daddr.addr_bytes[1] = 0xb1;
+    daddr.addr_bytes[2] = 0x56;
+    daddr.addr_bytes[3] = 0xc0;
+    daddr.addr_bytes[4] = 0x37;
+    daddr.addr_bytes[5] = 0xba;
+
+    struct ether_addr saddr;
+    saddr.addr_bytes[0] = 0x28;
+    saddr.addr_bytes[1] = 0xf1;
+    saddr.addr_bytes[2] = 0x0e;
+    saddr.addr_bytes[3] = 0x26;
+    saddr.addr_bytes[4] = 0x3d;
+    saddr.addr_bytes[5] = 0xc7;
+
+    srand(time(NULL));
+    int x = 100;
+    int y = 100;
+    uint32_t rgb = rand();
+
 	while (!force_quit) {
+
+
+
+
+
+        if(rte_pktmbuf_alloc_bulk(l2fwd_pktmbuf_pool, pkts_burst, MAX_PKT_BURST)!=0) {
+            printf("Allocation problem\n");
+        }
+        for(i  = 0; i < MAX_PKT_BURST; i++) {
+            //eth_hdr = rte_pktmbuf_mtod(pkts_burst[i], struct ether_hdr *);
+            eth_hdr = (struct ether_hdr *)rte_pktmbuf_append(pkts_burst[i], sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr));
+            eth_hdr->ether_type = htons(ETHER_TYPE_IPv6);
+            rte_memcpy(&(eth_hdr->s_addr), &saddr, sizeof(struct ether_addr));
+            rte_memcpy(&(eth_hdr->d_addr), &daddr, sizeof(struct ether_addr));
+
+            ipv6_hdr = rte_pktmbuf_mtod_offset(pkts_burst[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
+            ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
+
+            // Destination /64 IPv6 network
+            ipv6_hdr->dst_addr[0] = 0x40;
+            ipv6_hdr->dst_addr[1] = 0x00;
+            ipv6_hdr->dst_addr[2] = 0x42;
+            ipv6_hdr->dst_addr[3] = 0x00;
+            ipv6_hdr->dst_addr[4] = 0;
+            ipv6_hdr->dst_addr[5] = 0;
+            ipv6_hdr->dst_addr[6] = 0;
+            ipv6_hdr->dst_addr[7] = 0;
+
+            // X Coordinate
+            ipv6_hdr->dst_addr[8] = x >> 8;
+            ipv6_hdr->dst_addr[9] = x;
+
+            // Y Coordinate
+            ipv6_hdr->dst_addr[10] = y >> 8;
+            ipv6_hdr->dst_addr[11] = y;
+
+            // Color in rgb
+            ipv6_hdr->dst_addr[12] = rgb >> 24;
+            ipv6_hdr->dst_addr[13] = rgb >> 16;
+            ipv6_hdr->dst_addr[14] = rgb >> 8;
+            ipv6_hdr->dst_addr[15] = 0;
+
+            x++;
+            if (x > 900) {
+                x = 100;
+                y++;
+                if (y > 700) {
+                    y = 100;
+                    //srand(time(NULL));
+                    rgb = rand();
+                }
+            }
+        }
+        const uint16_t nb_tx = rte_eth_tx_burst(portid, 0, pkts_burst, MAX_PKT_BURST);
+        //printf("Send %u packets to port %u\n", nb_tx, portid);
+        if (unlikely(nb_tx < MAX_PKT_BURST)) {
+            uint16_t buf;
+
+            for (buf = nb_tx; buf < MAX_PKT_BURST; buf++)
+                rte_pktmbuf_free(pkts_burst[buf]);
+        }
+
+        // Read back
+        const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
+        for (int i = 0; i < nb_rx; i++) {
+			rte_pktmbuf_free(pkts_read[i]);
+        }
+
+
+
+
+
 
 		cur_tsc = rte_rdtsc();
 
@@ -232,6 +329,14 @@ l2fwd_main_loop(void)
 
 					/* do this only on master core */
 					if (lcore_id == rte_get_master_lcore()) {
+
+						struct rte_eth_stats eth_stats;
+						RTE_ETH_FOREACH_DEV(i) {
+							rte_eth_stats_get(i, &eth_stats);
+							printf("Total number of packets for port %u: send %lu packets (%lu bytes), received %lu packets (%lu bytes), dropped rx %lu and rest= %lu, %lu, %lu\n", i, eth_stats.opackets, eth_stats.obytes, eth_stats.ipackets, eth_stats.ibytes, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+						}
+
+
 						print_stats();
 						/* reset the timer */
 						timer_tsc = 0;
@@ -242,23 +347,23 @@ l2fwd_main_loop(void)
 			prev_tsc = cur_tsc;
 		}
 
-		/*
-		 * Read packet from RX queues
-		 */
-		for (i = 0; i < qconf->n_rx_port; i++) {
+		// /*
+		//  * Read packet from RX queues
+		//  */
+		// for (i = 0; i < qconf->n_rx_port; i++) {
 
-			portid = qconf->rx_port_list[i];
-			nb_rx = rte_eth_rx_burst(portid, 0,
-						 pkts_burst, MAX_PKT_BURST);
+		// 	portid = qconf->rx_port_list[i];
+		// 	nb_rx = rte_eth_rx_burst(portid, 0,
+		// 				 pkts_burst, MAX_PKT_BURST);
 
-			port_statistics[portid].rx += nb_rx;
+		// 	port_statistics[portid].rx += nb_rx;
 
-			for (j = 0; j < nb_rx; j++) {
-				m = pkts_burst[j];
-				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
-				l2fwd_simple_forward(m, portid);
-			}
-		}
+		// 	for (j = 0; j < nb_rx; j++) {
+		// 		m = pkts_burst[j];
+		// 		rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+		// 		l2fwd_simple_forward(m, portid);
+		// 	}
+		// }
 	}
 }
 
