@@ -1,7 +1,6 @@
 pixelflut_v6
 
 build/
-*.h
 *.o
 
 *.tmp
