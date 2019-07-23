@@ -2,7 +2,7 @@
 # Copyright(c) 2010-2014 Intel Corporation
 
 # binary name
-APP = pixelflut_v6_server
+APP = pixelflut_v6
 
 # all source are stored in SRCS-y
 SRCS-y := framebuffer.c frontend.c llist.c main.c network.c vnc.c workqueue.c sdl.c

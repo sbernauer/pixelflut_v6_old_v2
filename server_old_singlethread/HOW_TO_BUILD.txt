@@ -1,0 +1,9 @@
+make --trace
+
+This command will fail. Copy the linking part with gcc and append `pkg-config --libs sdl2 libvncserver` (with quotes) to the command.
+Be careful: Only copy one (the first) gcc command, this is a long line. It looks kind of:
+
+gcc -o pixelflut_v6_server -m64 -pthread [...],-Map=pixelflut_v6_server.map -Wl,--cref
+Change it to
+gcc -o pixelflut_v6_server -m64 -pthread [...],-Map=pixelflut_v6_server.map -Wl,--cref `pkg-config --libs sdl2 libvncserver`
+and execute it
