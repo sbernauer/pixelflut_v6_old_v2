@@ -504,7 +504,7 @@ l2fwd_parse_args(int argc, char **argv)
         /* nqueue */
         case 'r':
             l2fwd_rx_queue_per_port = l2fwd_parse_nqueue(optarg);
-            if (l2fwd_rx_queue_per_lcore == 0) {
+            if (l2fwd_rx_queue_per_port == 0) {
                 printf("invalid number of queues per port\n");
                 l2fwd_usage(prgname);
                 return -1;
@@ -660,7 +660,8 @@ main(int argc, char **argv)
     /*
      * Each logical core is assigned a dedicated TX queue on each port.
      */
-    for (int i = 0; i < l2fwd_rx_queue_per_port; i++) {
+    int queue_number;
+    for (queue_number = 0; queue_number < l2fwd_rx_queue_per_port; queue_number++) {
         RTE_ETH_FOREACH_DEV(portid) {
             /* skip ports that are not enabled */
             if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
