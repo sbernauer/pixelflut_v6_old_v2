@@ -192,8 +192,6 @@ l2fwd_main_loop(void)
         return;
     }
 
-    RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
-
     for (i = 0; i < qconf->n_rx_port; i++) {
 
         portid = qconf->rx_port_list[i];
@@ -660,6 +658,29 @@ main(int argc, char **argv)
     /*
      * Each logical core is assigned a dedicated TX queue on each port.
      */
+    RTE_ETH_FOREACH_DEV(portid) {
+        /* skip ports that are not enabled */
+        if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
+            continue;
+
+        if (nb_ports_in_mask % 2) {
+            l2fwd_dst_ports[portid] = last_port;
+            l2fwd_dst_ports[last_port] = portid;
+        }
+        else
+            last_port = portid;
+
+        nb_ports_in_mask++;
+    }
+    if (nb_ports_in_mask % 2) {
+        printf("Notice: odd number of ports in portmask.\n");
+        l2fwd_dst_ports[last_port] = last_port;
+    }
+
+    rx_lcore_id = 0;
+    qconf = NULL;
+
+    /* Initialize the port/queue configuration of each logical core */
     int queue_number;
     for (queue_number = 0; queue_number < l2fwd_rx_queue_per_port; queue_number++) {
         RTE_ETH_FOREACH_DEV(portid) {
@@ -667,48 +688,25 @@ main(int argc, char **argv)
             if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
                 continue;
 
-            if (nb_ports_in_mask % 2) {
-                l2fwd_dst_ports[portid] = last_port;
-                l2fwd_dst_ports[last_port] = portid;
+            /* get the lcore_id for this port */
+            while (rte_lcore_is_enabled(rx_lcore_id) == 0 ||
+                   lcore_queue_conf[rx_lcore_id].n_rx_port ==
+                   l2fwd_rx_queue_per_lcore) {
+                rx_lcore_id++;
+                if (rx_lcore_id >= RTE_MAX_LCORE)
+                    rte_exit(EXIT_FAILURE, "Not enough cores\n");
             }
-            else
-                last_port = portid;
 
-            nb_ports_in_mask++;
+            if (qconf != &lcore_queue_conf[rx_lcore_id]) {
+                /* Assigned a new logical core in the loop above. */
+                qconf = &lcore_queue_conf[rx_lcore_id];
+                nb_lcores++;
+            }
+
+            qconf->rx_port_list[qconf->n_rx_port] = portid;
+            qconf->n_rx_port++;
+            printf("Lcore %u: RX port %u\n", rx_lcore_id, portid);
         }
-        if (nb_ports_in_mask % 2) {
-            printf("Notice: odd number of ports in portmask.\n");
-            l2fwd_dst_ports[last_port] = last_port;
-        }
-    }
-
-    rx_lcore_id = 0;
-    qconf = NULL;
-
-    /* Initialize the port/queue configuration of each logical core */
-    RTE_ETH_FOREACH_DEV(portid) {
-        /* skip ports that are not enabled */
-        if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-            continue;
-
-        /* get the lcore_id for this port */
-        while (rte_lcore_is_enabled(rx_lcore_id) == 0 ||
-               lcore_queue_conf[rx_lcore_id].n_rx_port ==
-               l2fwd_rx_queue_per_lcore) {
-            rx_lcore_id++;
-            if (rx_lcore_id >= RTE_MAX_LCORE)
-                rte_exit(EXIT_FAILURE, "Not enough cores\n");
-        }
-
-        if (qconf != &lcore_queue_conf[rx_lcore_id]) {
-            /* Assigned a new logical core in the loop above. */
-            qconf = &lcore_queue_conf[rx_lcore_id];
-            nb_lcores++;
-        }
-
-        qconf->rx_port_list[qconf->n_rx_port] = portid;
-        qconf->n_rx_port++;
-        printf("Lcore %u: RX port %u\n", rx_lcore_id, portid);
     }
 
     nb_mbufs = RTE_MAX(nb_ports * (nb_rxd + nb_txd + MAX_PKT_BURST +
