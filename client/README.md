@@ -1,3 +1,7 @@
+# pixelflut_v6_client
+This program generates traffic to draw rectangles in random colors at a pixelflut_v6 server.
+For pixelflut_v6 see https://entropia.de/GPN17:Pingxelflut
+
 # Installing
 This project uses DPDK.
 Please take a look if your hardware is supported at http://core.dpdk.org/supported/
@@ -33,7 +37,7 @@ export RTE_SDK=/my/path/to/dpdk/folder
 make
 ```
 
-### Run Build pixelflut_v6_client
+# Run Build pixelflut_v6_client
 Make shure, that you change MAC-Adresses and IPv6 /64-subnet to your desired adresses and recompile.
 The adresses are currently not configurable.
 First parameters are EAL-Parameters from DPDK (see http://doc.dpdk.org/guides/linux_gsg/linux_eal_parameters.html)
@@ -56,7 +60,7 @@ To use 8 cores on 1 port (and more frequent statistics):
 sudo build/pixelflut_v6_client -l 0-7 -- -p 0x1 -r 8 -T 1
 ```
 
-To use 16 cores on 4 ports
+To use 16 cores on 4 ports:
 ```
 sudo build/pixelflut_v6_client -l 0-15 -- -p 0xf -r 4 -T 1
 ```
