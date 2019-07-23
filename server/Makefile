@@ -2,10 +2,10 @@
 # Copyright(c) 2010-2014 Intel Corporation
 
 # binary name
-APP = pixelflut_v6_client
+APP = pixelflut_v6
 
 # all source are stored in SRCS-y
-SRCS-y := client.c
+SRCS-y := network.c
 
 # Build using pkg-config variables if possible
 $(shell pkg-config --exists libdpdk)
