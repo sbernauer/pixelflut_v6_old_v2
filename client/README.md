@@ -1,9 +1,7 @@
-## Set up hugepages
-```
-echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-mkdir -p /mnt/huge
-mount -t hugetlbfs nodev /mnt/huge
-```
+# Installing
+This project uses DPDK.
+Please take a look if your hardware is supported at http://core.dpdk.org/supported/
+It requires a compiled DPDK, follow the instructions for setting DPDK up at http://doc.dpdk.org/guides/linux_gsg/
 
 ## Dependencies
 ```
@@ -11,10 +9,16 @@ apt install libnuma-dev linux-source linux-headers-4.9.0-9-all libsdl2-dev git b
 ```
 You should adopt the linux-headers-x.x.x-x-all package to your kernel version
 
-## Build dpdk
-See http://doc.dpdk.org/guides/linux_gsg/build_dpdk.html
+## Build and set up dpdk
+If not done already done build DPDK: http://doc.dpdk.org/guides/linux_gsg/build_dpdk.html
+### Allocate huge pages
+```
+echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+mkdir -p /mnt/huge
+mount -t hugetlbfs nodev /mnt/huge
+```
 
-## Bind nic
+### Bind nic
 ```
 export RTE_SDK=/my/path/to/dpdk/folder
 $RTE_SDK/usertools/dpdk-devbind.py --status
