@@ -559,7 +559,7 @@ net_listen(int argc, char **argv, struct fb* fb)
     ret = rte_eal_init(argc, argv);
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
-    printf("EAL %i parameters", ret);
+    printf("EAL consumed %i parameters\n", ret);
     argc -= ret;
     argv += ret;
 
@@ -571,7 +571,7 @@ net_listen(int argc, char **argv, struct fb* fb)
     ret = l2fwd_parse_args(argc, argv);
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Invalid L2FWD arguments\n");
-    printf("L2FWD consumed %i parameters", ret);
+    printf("L2FWD consumed %i parameters\n", ret);
 
     printf("MAC updating %s\n", mac_updating ? "enabled" : "disabled");
 
