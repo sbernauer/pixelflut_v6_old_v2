@@ -147,11 +147,14 @@ int main(int argc, char** argv) {
 
 	unsigned int amountPixelflutParameters = 1;
 	while(amountPixelflutParameters < argc) {
+		printf("%s\n", argv[amountPixelflutParameters]);
 		if (strcmp("--", argv[amountPixelflutParameters]) == 0) {
 			break;
 		}
 		amountPixelflutParameters++;
 	}
+	amountPixelflutParameters++;
+	printf("amountPixelflutParameters: %u\n", amountPixelflutParameters);
 
 	while((opt = getopt(amountPixelflutParameters, argv, "w:h:r:s:l:f:d?")) != -1) {
 		switch(opt) {
@@ -198,13 +201,10 @@ int main(int argc, char** argv) {
 				break;
 			default:
 				show_usage(argv[0]);
-				//err = -EINVAL;
-				//goto fail;
+				err = -EINVAL;
+				goto fail;
 		}
 	}
-
-	argc -= amountPixelflutParameters;
-	argv += amountPixelflutParameters;
 
 	if(frontend_cnt == 0) {
 		printf("WARNING: No frontends specified, continuing without any frontends\n");
@@ -222,7 +222,9 @@ int main(int argc, char** argv) {
 
 	printf("Registering frontends\n");
 	llist_init(&fronts);
+	printf("Foo before loop. frontend_cnt: %u\n", frontend_cnt);
 	while(frontend_cnt > 0 && frontend_cnt--) {
+		printf("Foo in loop\n");
 		char* frontid = frontend_names[frontend_cnt];
 		char* options = frontend_spec_extract_name(frontid);
 		struct frontend_def* frontdef = frontend_get_def(frontid);
@@ -256,7 +258,7 @@ int main(int argc, char** argv) {
 
 		if(strcmp(frontdef->name, "VNC server frontend") == 0) {
 			if((err=vnc_configure_font(front, FONT))) {
-				fprintf(stderr, "Could not register font %s for '%s'\n", FONT, frontdef->name);
+				fprintf(stderr, "Could not register font %s for '%s'. Error: %i\n", FONT, frontdef->name, err);
 				goto fail_fronts_free_name;
 			} else {
 				fprintf(stdout, "Registered font %s for '%s'\n", FONT, frontdef->name);
@@ -265,6 +267,7 @@ int main(int argc, char** argv) {
 
 		free(frontid);
 	}
+	printf("Foo after loop\n");
 
 	// if(handle_signals) {
 	// 	if(signal(SIGINT, doshutdown)) {
@@ -287,10 +290,15 @@ int main(int argc, char** argv) {
 	// inaddr = (struct sockaddr_storage*)addr_list->ai_addr;
 	// addr_len = addr_list->ai_addrlen;
 
+	argc -= amountPixelflutParameters;
+	argv += amountPixelflutParameters;
+	printf("Foo after moving aprametedr\n");
+	printf("%u %s\n", argc, argv);
 	if((err = net_listen(argc, argv, fb))) {
 		fprintf(stderr, "Failed to start listening: %d => %s\n", err, strerror(-err));
 		goto fail;
 	}
+	printf("Foo after net_listen\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &fpsSnapshot);
 	while(!do_exit) {

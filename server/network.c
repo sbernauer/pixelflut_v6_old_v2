@@ -39,6 +39,11 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
+#include "network.h"
+#include "framebuffer.h"
+#include "llist.h"
+#include "util.h"
+
 static volatile bool force_quit;
 
 // TODO unused parameter
@@ -150,25 +155,11 @@ print_stats(void)
     printf("\n====================================================\n");
 }
 
-static void
-l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
-{
-    unsigned dst_port;
-    int sent;
-    struct rte_eth_dev_tx_buffer *buffer;
-
-    dst_port = l2fwd_dst_ports[portid];
-
-    buffer = tx_buffer[dst_port];
-    sent = rte_eth_tx_buffer(dst_port, 0, buffer, m);
-    if (sent)
-        port_statistics[dst_port].tx += sent;
-}
-
 /* main processing loop */
 static void
-l2fwd_main_loop(void *fb)
+l2fwd_main_loop(struct fb *fb)
 {
+    printf("l2fwd_main_loop");
     struct rte_mbuf *pkts_read[MAX_PKT_BURST];
     struct rte_mbuf *m;
     unsigned lcore_id;
@@ -311,12 +302,12 @@ l2fwd_main_loop(void *fb)
     }
 }
 
-static int
-l2fwd_launch_one_lcore(__attribute__((unused)) void *fb)
-{
-    l2fwd_main_loop(fb);
-    return 0;
-}
+// static int
+// l2fwd_launch_one_lcore(void *fb)
+// {
+//     l2fwd_main_loop(fb);
+//     return 0;
+// }
 
 /* display usage */
 static void
@@ -553,8 +544,9 @@ signal_handler(int signum)
 }
 
 int
-net_listen(int argc, char **argv, struct fb *fb)
+net_listen(int argc, char **argv, struct fb* fb)
 {
+    printf("net_listen");
     struct lcore_queue_conf *qconf;
     int ret;
     uint16_t nb_ports;
@@ -772,7 +764,7 @@ net_listen(int argc, char **argv, struct fb *fb)
 
     ret = 0;
     /* launch per-lcore init on every lcore */
-    rte_eal_mp_remote_launch(l2fwd_launch_one_lcore, fb, CALL_MASTER);
+    rte_eal_mp_remote_launch(l2fwd_main_loop, fb, CALL_MASTER);
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
         if (rte_eal_wait_lcore(lcore_id) < 0) {
             ret = -1;
