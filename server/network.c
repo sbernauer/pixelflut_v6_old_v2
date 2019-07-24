@@ -545,9 +545,20 @@ signal_handler(int signum)
     }
 }
 
-int
-net_listen(int argc, char **argv, struct fb* fb)
+struct async_thread_args
 {
+    int argc;
+    char **argv;
+    struct fb* fb;
+};
+
+void *run_async(struct async_thread_args args) 
+{
+    int argc = args.argc;
+    char** argv = args.argv;
+    struct fb *fb = args.fb;
+
+
     struct lcore_queue_conf *qconf;
     int ret;
     uint16_t nb_ports;
@@ -788,5 +799,20 @@ net_listen(int argc, char **argv, struct fb* fb)
     // }
     // printf("Bye...\n");
 
-    return ret;
+    return NULL;
+}
+
+int
+net_listen(int argc, char **argv, struct fb* fb) {
+    pthread_t async_thread;
+    struct async_thread_args args;
+    args.argc = argc;
+    args.argv = argv;
+    args.fb = fb;
+
+    /* create a second thread which executes inc_x(&x) */
+    if(pthread_create(&async_thread, NULL, run_async, &args)) {
+        fprintf(stderr, "Error creating thread\n");
+        return 1;
+    }
 }
