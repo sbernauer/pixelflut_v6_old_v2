@@ -145,55 +145,66 @@ int main(int argc, char** argv) {
 	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0;
 	double loadAverages[3];
 
-	// while((opt = getopt(argc, argv, "w:h:r:s:l:f:d?")) != -1) {
-	// 	switch(opt) {
-	// 		case('w'):
-	// 			width = atoi(optarg);
-	// 			if(width <= 0) {
-	// 				fprintf(stderr, "Width must be > 0\n");
-	// 				err = -EINVAL;
-	// 				goto fail;
-	// 			}
-	// 			break;
-	// 		case('h'):
-	// 			height = atoi(optarg);
-	// 			if(height <= 0) {
-	// 				fprintf(stderr, "Height must be > 0\n");
-	// 				err = -EINVAL;
-	// 				goto fail;
-	// 			}
-	// 			break;
-	// 		case('r'):
-	// 			screen_update_rate = atoi(optarg);
-	// 			if(screen_update_rate <= 0) {
-	// 				fprintf(stderr, "Screen update rate must be > 0\n");
-	// 				err = -EINVAL;
-	// 				goto fail;
-	// 			}
-	// 			break;
-	// 		case('f'):
-	// 			if(frontend_cnt >= MAX_FRONTENDS) {
-	// 				fprintf(stderr, "Maximum number of frontends reached.\n");
-	// 				err = -EINVAL;
-	// 				goto fail;
-	// 			}
-	// 			frontend_names[frontend_cnt] = strdup(optarg);
-	// 			if(!frontend_names[frontend_cnt]) {
-	// 				fprintf(stderr, "Can not copy frontend spec. Out of memory\n");
-	// 				err = -ENOMEM;
-	// 				goto fail;
-	// 			}
-	// 			frontend_cnt++;
-	// 			break;
-	// 		case('d'):
-	// 			showTextualInfo = false;
-	// 			break;
-	// 		default:
-	// 			show_usage(argv[0]);
-	// 			err = -EINVAL;
-	// 			goto fail;
-	// 	}
-	// }
+	unsigned int amountPixelflutParameters = 1;
+	while(amountPixelflutParameters < argc) {
+		if (strcmp("--", argv[amountPixelflutParameters]) == 0) {
+			break;
+		}
+		amountPixelflutParameters++;
+	}
+
+	while((opt = getopt(amountPixelflutParameters, argv, "w:h:r:s:l:f:d?")) != -1) {
+		switch(opt) {
+			case('w'):
+				width = atoi(optarg);
+				if(width <= 0) {
+					fprintf(stderr, "Width must be > 0\n");
+					err = -EINVAL;
+					goto fail;
+				}
+				break;
+			case('h'):
+				height = atoi(optarg);
+				if(height <= 0) {
+					fprintf(stderr, "Height must be > 0\n");
+					err = -EINVAL;
+					goto fail;
+				}
+				break;
+			case('r'):
+				screen_update_rate = atoi(optarg);
+				if(screen_update_rate <= 0) {
+					fprintf(stderr, "Screen update rate must be > 0\n");
+					err = -EINVAL;
+					goto fail;
+				}
+				break;
+			case('f'):
+				if(frontend_cnt >= MAX_FRONTENDS) {
+					fprintf(stderr, "Maximum number of frontends reached.\n");
+					err = -EINVAL;
+					goto fail;
+				}
+				frontend_names[frontend_cnt] = strdup(optarg);
+				if(!frontend_names[frontend_cnt]) {
+					fprintf(stderr, "Can not copy frontend spec. Out of memory\n");
+					err = -ENOMEM;
+					goto fail;
+				}
+				frontend_cnt++;
+				break;
+			case('d'):
+				showTextualInfo = false;
+				break;
+			default:
+				show_usage(argv[0]);
+				//err = -EINVAL;
+				//goto fail;
+		}
+	}
+
+	argc -= amountPixelflutParameters;
+	argv += amountPixelflutParameters;
 
 	if(frontend_cnt == 0) {
 		printf("WARNING: No frontends specified, continuing without any frontends\n");
