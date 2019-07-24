@@ -316,6 +316,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Failed to start listening: %d => %s\n", err, strerror(-err));
 		goto fail;
 	}
+	printf("\n\n\n\n\n\n\nListening for packets...\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &fpsSnapshot);
 	while(!do_exit) {

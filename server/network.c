@@ -159,7 +159,6 @@ print_stats(void)
 static void
 l2fwd_main_loop(struct fb *fb)
 {
-    printf("Starting l2fwd_main_loop");
     struct rte_mbuf *pkts_read[MAX_PKT_BURST];
     struct rte_mbuf *m;
     unsigned lcore_id;
@@ -181,6 +180,7 @@ l2fwd_main_loop(struct fb *fb)
     lcore_id = rte_lcore_id();
     qconf = &lcore_queue_conf[lcore_id];
 
+    printf("Starting l2fwd_main_loop on core %u and port %u", lcore_id, qconf->n_rx_port);
     if (qconf->n_rx_port == 0) {
         RTE_LOG(INFO, L2FWD, "lcore %u has nothing to do\n", lcore_id);
         return;
@@ -766,7 +766,10 @@ net_listen(int argc, char **argv, struct fb* fb)
 
     ret = 0;
     /* launch per-lcore init on every lcore */
-    rte_eal_mp_remote_launch(l2fwd_main_loop, fb, CALL_MASTER);
+    // If call_master set to SKIP_MASTER, the MASTER lcore does not call the function.
+    // If call_master is set to CALL_MASTER, the function is also called on master before returning.
+    // In any case, the master lcore returns as soon as it finished its job and knows nothing about the completion of f on the other lcores. 
+    rte_eal_mp_remote_launch(l2fwd_main_loop, fb, SKIP_MASTER);
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
         if (rte_eal_wait_lcore(lcore_id) < 0) {
             ret = -1;
@@ -774,15 +777,15 @@ net_listen(int argc, char **argv, struct fb* fb)
         }
     }
 
-    RTE_ETH_FOREACH_DEV(portid) {
-        if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-            continue;
-        printf("Closing port %d...", portid);
-        rte_eth_dev_stop(portid);
-        rte_eth_dev_close(portid);
-        printf(" Done\n");
-    }
-    printf("Bye...\n");
+    // RTE_ETH_FOREACH_DEV(portid) {
+    //     if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
+    //         continue;
+    //     printf("Closing port %d...", portid);
+    //     rte_eth_dev_stop(portid);
+    //     rte_eth_dev_close(portid);
+    //     printf(" Done\n");
+    // }
+    // printf("Bye...\n");
 
     return ret;
 }
