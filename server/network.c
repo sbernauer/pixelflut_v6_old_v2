@@ -289,6 +289,7 @@ l2fwd_main_loop(struct fb *fb)
                             rte_eth_stats_get(i, &eth_stats);
                             printf("Total number of packets for port %u: send %lu packets (%lu bytes), received %lu packets (%lu bytes), dropped rx %lu and rest= %lu, %lu, %lu\n", i, eth_stats.opackets, eth_stats.obytes, eth_stats.ipackets, eth_stats.ibytes, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
                         }
+                        printf("PIXEL COUNTER: %llu\n", fb->pixelCounter);
 
 
                         print_stats();
