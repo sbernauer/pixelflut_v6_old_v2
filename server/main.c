@@ -243,9 +243,7 @@ int main(int argc, char** argv) {
 
 	printf("Registering frontends\n");
 	llist_init(&fronts);
-	printf("Foo before loop. frontend_cnt: %u\n", frontend_cnt);
 	while(frontend_cnt > 0 && frontend_cnt--) {
-		printf("Foo in loop\n");
 		char* frontid = frontend_names[frontend_cnt];
 		char* options = frontend_spec_extract_name(frontid);
 		struct frontend_def* frontdef = frontend_get_def(frontid);
@@ -288,7 +286,6 @@ int main(int argc, char** argv) {
 
 		free(frontid);
 	}
-	printf("Foo after loop\n");
 
 	// if(handle_signals) {
 	// 	if(signal(SIGINT, doshutdown)) {
