@@ -50,10 +50,8 @@ RTE_TARGET ?= $(notdir $(abspath $(dir $(firstword $(wildcard $(RTE_SDK)/*/.conf
 include $(RTE_SDK)/mk/rte.vars.mk
 
 CFLAGS += $(WERROR_FLAGS)
-PC_FILE := $(shell pkg-config --path sdl2 libvncserver)
 CFLAGS += -O3 $(shell pkg-config --cflags sdl2 libvncserver)
 LDFLAGS +=  $(shell pkg-config --libs sdl2 libvncserver)
-
 
 # workaround for a gcc bug with noreturn attribute
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=12603
