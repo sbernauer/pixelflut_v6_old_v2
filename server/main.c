@@ -116,6 +116,23 @@ fail:
 	return err;
 }
 
+char **new_argv(int count, ...)
+{
+    va_list args;
+    int i;
+    char **argv = malloc((count+1) * sizeof(char*));
+    char *temp;
+    va_start(args, count);
+    for (i = 0; i < count; i++) {
+        temp = va_arg(args, char*);
+        argv[i] = malloc(sizeof(temp));
+        argv[i] = temp;
+    }
+    argv[i] = NULL;
+    va_end(args);
+    return argv;
+}
+
 int main(int argc, char** argv) {
 
 	int err, opt;
@@ -145,16 +162,22 @@ int main(int argc, char** argv) {
 	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0;
 	double loadAverages[3];
 
-	unsigned int amountPixelflutParameters = 1;
-	while(amountPixelflutParameters < argc) {
-		printf("%s\n", argv[amountPixelflutParameters]);
-		if (strcmp("--", argv[amountPixelflutParameters]) == 0) {
-			break;
-		}
-		amountPixelflutParameters++;
-	}
+	// unsigned int amountPixelflutParameters = 1;
+	// while(amountPixelflutParameters < argc) {
+	// 	printf("%s\n", argv[amountPixelflutParameters]);
+	// 	if (strcmp("--", argv[amountPixelflutParameters]) == 0) {
+	// 		break;
+	// 	}
+	// 	amountPixelflutParameters++;
+	// }
 
-	while((opt = getopt(amountPixelflutParameters, argv, "w:h:r:s:l:f:d?")) != -1) {
+	int tmp_argc = 3;
+	char** tmp_argv = new_argv(tmp_argc, "foobar", "-f", "vnc");
+	printf("TODO: Passed arguments following to pixelflut: %s %s\n", tmp_argv[1], tmp_argv[2]);
+
+
+	while((opt = getopt(tmp_argc, tmp_argv, "w:h:r:s:l:f:d?")) != -1) {
+		printf("parsing...\n");
 		switch(opt) {
 			case('w'):
 				width = atoi(optarg);
@@ -288,16 +311,14 @@ int main(int argc, char** argv) {
 	// inaddr = (struct sockaddr_storage*)addr_list->ai_addr;
 	// addr_len = addr_list->ai_addrlen;
 
-	amountPixelflutParameters++;
-	argc -= amountPixelflutParameters;
-	argv += amountPixelflutParameters;
-	printf("Foo after moving aprametedr\n");
-	printf("%u %s\n", argc, argv);
+	// amountPixelflutParameters++;
+	// argc -= amountPixelflutParameters;
+	// argv += amountPixelflutParameters;
+	// printf("%u %s\n", argc, argv);
 	if((err = net_listen(argc, argv, fb))) {
 		fprintf(stderr, "Failed to start listening: %d => %s\n", err, strerror(-err));
 		goto fail;
 	}
-	printf("Foo after net_listen\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &fpsSnapshot);
 	while(!do_exit) {

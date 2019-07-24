@@ -159,7 +159,6 @@ print_stats(void)
 static void
 l2fwd_main_loop(struct fb *fb)
 {
-    printf("l2fwd_main_loop");
     struct rte_mbuf *pkts_read[MAX_PKT_BURST];
     struct rte_mbuf *m;
     unsigned lcore_id;
@@ -546,7 +545,6 @@ signal_handler(int signum)
 int
 net_listen(int argc, char **argv, struct fb* fb)
 {
-    printf("net_listen");
     struct lcore_queue_conf *qconf;
     int ret;
     uint16_t nb_ports;
