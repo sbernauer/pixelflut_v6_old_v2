@@ -167,19 +167,22 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 
 /* main processing loop */
 static void
-l2fwd_main_loop(void)
+l2fwd_main_loop(void *fb)
 {
-    struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
     struct rte_mbuf *pkts_read[MAX_PKT_BURST];
     struct rte_mbuf *m;
-    int sent;
     unsigned lcore_id;
     uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
     unsigned i, j, portid, nb_rx;
     struct lcore_queue_conf *qconf;
     const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
             BURST_TX_DRAIN_US;
-    struct rte_eth_dev_tx_buffer *buffer;
+
+    struct ether_hdr *eth_hdr;
+    struct ipv4_hdr *ipv4_hdr;
+    struct ipv6_hdr *ipv6_hdr;
+    uint16_t x, y;
+    uint32_t rgb;
 
     prev_tsc = 0;
     timer_tsc = 0;
@@ -200,97 +203,68 @@ l2fwd_main_loop(void)
 
     }
 
-    struct ether_hdr *eth_hdr;
-    struct ipv6_hdr *ipv6_hdr;
-
-    struct ether_addr daddr;
-    daddr.addr_bytes[0] = 0xf8;
-    daddr.addr_bytes[1] = 0xb1;
-    daddr.addr_bytes[2] = 0x56;
-    daddr.addr_bytes[3] = 0xc0;
-    daddr.addr_bytes[4] = 0x37;
-    daddr.addr_bytes[5] = 0xba;
-
-    struct ether_addr saddr;
-    saddr.addr_bytes[0] = 0x28;
-    saddr.addr_bytes[1] = 0xf1;
-    saddr.addr_bytes[2] = 0x0e;
-    saddr.addr_bytes[3] = 0x26;
-    saddr.addr_bytes[4] = 0x3d;
-    saddr.addr_bytes[5] = 0xc7;
-
-    srand(time(NULL));
-    int x = 100;
-    int y = 100;
-    uint32_t rgb = rand();
-
     while (!force_quit) {
 
+        // // Read back
+        // const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
+        // for (int i = 0; i < nb_rx; i++) {
+        //     rte_pktmbuf_free(pkts_read[i]);
+        // }
+
+        /*
+        * Read packets from RX queues
+        */
+        for (i = 0; i < qconf->n_rx_port; i++) {
+
+            portid = qconf->rx_port_list[i];
+            nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
+
+            port_statistics[portid].rx += nb_rx;
+
+            for (j = 0; j < nb_rx; j++) {
 
 
+                m = pkts_read[j];
 
+                eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
+                // print_ether_addr("src=", &eth_hdr->s_addr);
+                // print_ether_addr(" - dst=", &eth_hdr->d_addr);
+                // printf(" - queue=0x%x", (unsigned int)i);
 
-        if(rte_pktmbuf_alloc_bulk(l2fwd_pktmbuf_pool, pkts_burst, MAX_PKT_BURST)!=0) {
-            printf("Allocation problem\n");
-        }
-        for(i  = 0; i < MAX_PKT_BURST; i++) {
-            //eth_hdr = rte_pktmbuf_mtod(pkts_burst[i], struct ether_hdr *);
-            eth_hdr = (struct ether_hdr *)rte_pktmbuf_append(pkts_burst[i], sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr));
-            eth_hdr->ether_type = htons(ETHER_TYPE_IPv6);
-            rte_memcpy(&(eth_hdr->s_addr), &saddr, sizeof(struct ether_addr));
-            rte_memcpy(&(eth_hdr->d_addr), &daddr, sizeof(struct ether_addr));
+                if (eth_hdr->ether_type == rte_be_to_cpu_16(ETHER_TYPE_IPv6)) {
+                    // printf("Found IPv6: ");
+                    ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr *, sizeof(struct ether_hdr));
 
-            ipv6_hdr = rte_pktmbuf_mtod_offset(pkts_burst[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
-            ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
+                    // if (ipv6_hdr->proto == 58) { // ICMP6
+                        //int icmp_type = *(&m + (sizeof(struct ether_hdr)));
+                        // uint8_t *icmp_type = rte_pktmbuf_mtod_offset(m, uint8_t*, sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr));
+                        // printf("Detected ICMP6 (Type: %u)", *icmp_type);
+                        // TODO Reply to ICMP6
+                    // }
+                    // Continuing without any restriction, client can send whatever type he wants
 
-            // Destination /64 IPv6 network
-            ipv6_hdr->dst_addr[0] = 0x40;
-            ipv6_hdr->dst_addr[1] = 0x00;
-            ipv6_hdr->dst_addr[2] = 0x42;
-            ipv6_hdr->dst_addr[3] = 0x00;
-            ipv6_hdr->dst_addr[4] = 0;
-            ipv6_hdr->dst_addr[5] = 0;
-            ipv6_hdr->dst_addr[6] = 0;
-            ipv6_hdr->dst_addr[7] = 0;
+                    uint8_t *dst = ipv6_hdr->dst_addr;
+                    // print_ip6_addr(" IpV6: src: ", ipv6_hdr->src_addr);
+                    // print_ip6_addr(" IpV6: dst: ", ipv6_hdr->dst_addr);
 
-            // X Coordinate
-            ipv6_hdr->dst_addr[8] = x >> 8;
-            ipv6_hdr->dst_addr[9] = x;
+                    x = (dst[8] << 8) + dst[9];
+                    y = (dst[10] << 8) + dst[11];
+                    rgb = (dst[12] << 24) + (dst[13] << 16) + (dst[14] << 8);
+                    //printf(" --- x: %d y: %d rgb: %08x ---\n", x, y, rgb);
+                    fb_set_pixel(fb, x, y, rgb);
 
-            // Y Coordinate
-            ipv6_hdr->dst_addr[10] = y >> 8;
-            ipv6_hdr->dst_addr[11] = y;
+                } else if (eth_hdr->ether_type == rte_be_to_cpu_16(ETHER_TYPE_IPv4)) {
+                    // printf("Found IPv4: ");
 
-            // Color in rgb
-            ipv6_hdr->dst_addr[12] = rgb >> 24;
-            ipv6_hdr->dst_addr[13] = rgb >> 16;
-            ipv6_hdr->dst_addr[14] = rgb >> 8;
-            ipv6_hdr->dst_addr[15] = 0;
-
-            x++;
-            if (x > 900) {
-                x = 100;
-                y++;
-                if (y > 700) {
-                    y = 100;
-                    //srand(time(NULL));
-                    rgb = rand();
+                    ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, sizeof(struct ether_hdr));
+                    // printf(" IPv4 src: %x dst: %x\n", ipv4_hdr->src_addr, ipv4_hdr->dst_addr);
+                } else {
+                    printf("Unkown protocol: %d", eth_hdr->ether_type);
                 }
+
+                rte_pktmbuf_free(m);
+
             }
-        }
-        const uint16_t nb_tx = rte_eth_tx_burst(portid, 0, pkts_burst, MAX_PKT_BURST);
-        //printf("Send %u packets to port %u\n", nb_tx, portid);
-        if (unlikely(nb_tx < MAX_PKT_BURST)) {
-            uint16_t buf;
-
-            for (buf = nb_tx; buf < MAX_PKT_BURST; buf++)
-                rte_pktmbuf_free(pkts_burst[buf]);
-        }
-
-        // Read back
-        const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
-        for (int i = 0; i < nb_rx; i++) {
-            rte_pktmbuf_free(pkts_read[i]);
         }
 
 
@@ -305,17 +279,6 @@ l2fwd_main_loop(void)
          */
         diff_tsc = cur_tsc - prev_tsc;
         if (unlikely(diff_tsc > drain_tsc)) {
-
-            for (i = 0; i < qconf->n_rx_port; i++) {
-
-                portid = l2fwd_dst_ports[qconf->rx_port_list[i]];
-                buffer = tx_buffer[portid];
-
-                sent = rte_eth_tx_buffer_flush(portid, 0, buffer);
-                if (sent)
-                    port_statistics[portid].tx += sent;
-
-            }
 
             /* if timer is enabled */
             if (timer_period > 0) {
@@ -345,31 +308,13 @@ l2fwd_main_loop(void)
 
             prev_tsc = cur_tsc;
         }
-
-        // /*
-        //  * Read packet from RX queues
-        //  */
-        // for (i = 0; i < qconf->n_rx_port; i++) {
-
-        //  portid = qconf->rx_port_list[i];
-        //  nb_rx = rte_eth_rx_burst(portid, 0,
-        //               pkts_burst, MAX_PKT_BURST);
-
-        //  port_statistics[portid].rx += nb_rx;
-
-        //  for (j = 0; j < nb_rx; j++) {
-        //      m = pkts_burst[j];
-        //      rte_prefetch0(rte_pktmbuf_mtod(m, void *));
-        //      l2fwd_simple_forward(m, portid);
-        //  }
-        // }
     }
 }
 
 static int
-l2fwd_launch_one_lcore(__attribute__((unused)) void *dummy)
+l2fwd_launch_one_lcore(__attribute__((unused)) void *fb)
 {
-    l2fwd_main_loop();
+    l2fwd_main_loop(fb);
     return 0;
 }
 
@@ -608,7 +553,7 @@ signal_handler(int signum)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, struct fb *fb)
 {
     struct lcore_queue_conf *qconf;
     int ret;
@@ -681,7 +626,7 @@ main(int argc, char **argv)
     qconf = NULL;
 
     /* Initialize the port/queue configuration of each logical core */
-    int queue_number;
+    unsigned int queue_number;
     for (queue_number = 0; queue_number < l2fwd_rx_queue_per_port; queue_number++) {
         RTE_ETH_FOREACH_DEV(portid) {
             /* skip ports that are not enabled */
@@ -827,7 +772,7 @@ main(int argc, char **argv)
 
     ret = 0;
     /* launch per-lcore init on every lcore */
-    rte_eal_mp_remote_launch(l2fwd_launch_one_lcore, NULL, CALL_MASTER);
+    rte_eal_mp_remote_launch(l2fwd_launch_one_lcore, fb, CALL_MASTER);
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
         if (rte_eal_wait_lcore(lcore_id) < 0) {
             ret = -1;
