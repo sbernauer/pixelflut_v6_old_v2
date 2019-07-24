@@ -206,6 +206,7 @@ l2fwd_main_loop(struct fb *fb)
         * Read packets from RX queues
         */
         for (i = 0; i < qconf->n_rx_port; i++) {
+			fb_set_pixel(fb, 10, 10, 0xff11cc);        	
 
             portid = qconf->rx_port_list[i];
             nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
@@ -242,7 +243,7 @@ l2fwd_main_loop(struct fb *fb)
                     x = (dst[8] << 8) + dst[9];
                     y = (dst[10] << 8) + dst[11];
                     rgb = (dst[12] << 24) + (dst[13] << 16) + (dst[14] << 8);
-                    //printf(" --- x: %d y: %d rgb: %08x ---\n", x, y, rgb);
+                    printf(" --- x: %d y: %d rgb: %08x ---\n", x, y, rgb);
                     fb_set_pixel(fb, x, y, rgb);
 
                 } else if (eth_hdr->ether_type == rte_be_to_cpu_16(ETHER_TYPE_IPv4)) {
