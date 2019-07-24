@@ -69,6 +69,7 @@ static uint32_t l2fwd_enabled_port_mask = 0;
 static uint32_t l2fwd_dst_ports[RTE_MAX_ETHPORTS];
 
 static unsigned int l2fwd_rx_queue_per_lcore = 1;
+static unsigned int l2fwd_rx_queue_per_port = 1;
 
 #define MAX_RX_QUEUE_PER_LCORE 16
 #define MAX_TX_QUEUE_PER_PORT 16
@@ -190,8 +191,6 @@ l2fwd_main_loop(void)
         RTE_LOG(INFO, L2FWD, "lcore %u has nothing to do\n", lcore_id);
         return;
     }
-
-    RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
 
     for (i = 0; i < qconf->n_rx_port; i++) {
 
@@ -370,7 +369,6 @@ l2fwd_main_loop(void)
 static int
 l2fwd_launch_one_lcore(__attribute__((unused)) void *dummy)
 {
-    printf("l2fwd_launch_one_lcore\n");
     l2fwd_main_loop();
     return 0;
 }
@@ -382,8 +380,9 @@ l2fwd_usage(const char *prgname)
     printf("%s [EAL options] -- -p PORTMASK [-q NQ]\n"
            "  -p PORTMASK: hexadecimal bitmask of ports to configure\n"
            "  -q NQ: number of queue (=ports) per lcore (default is 1)\n"
+           "  -r NQ: number of queue (=threads) per port (default is 1)\n"
            "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 10 default, 86400 maximum)\n"
-           "  --[no-]mac-updating: Enable or disable MAC addresses updating (enabled by default)\n"
+           "  --[no-]mac-updating: NOT USED FEATURE!!! Enable or disable MAC addresses updating (enabled by default)\n"
            "      When enabled:\n"
            "       - The source MAC address is replaced by the TX port MAC address\n"
            "       - The destination MAC address is replaced by 02:00:00:00:00:TX_PORT_ID\n",
@@ -443,7 +442,8 @@ l2fwd_parse_timer_period(const char *q_arg)
 
 static const char short_options[] =
     "p:"  /* portmask */
-    "q:"  /* number of queues */
+    "q:"  /* number of queues per lcore */
+    "r:"  /* number of queues per port */
     "T:"  /* timer period */
     ;
 
@@ -494,6 +494,16 @@ l2fwd_parse_args(int argc, char **argv)
             l2fwd_rx_queue_per_lcore = l2fwd_parse_nqueue(optarg);
             if (l2fwd_rx_queue_per_lcore == 0) {
                 printf("invalid queue number\n");
+                l2fwd_usage(prgname);
+                return -1;
+            }
+            break;
+
+        /* nqueue */
+        case 'r':
+            l2fwd_rx_queue_per_port = l2fwd_parse_nqueue(optarg);
+            if (l2fwd_rx_queue_per_port == 0) {
+                printf("invalid number of queues per port\n");
                 l2fwd_usage(prgname);
                 return -1;
             }
@@ -671,29 +681,32 @@ main(int argc, char **argv)
     qconf = NULL;
 
     /* Initialize the port/queue configuration of each logical core */
-    RTE_ETH_FOREACH_DEV(portid) {
-        /* skip ports that are not enabled */
-        if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-            continue;
+    int queue_number;
+    for (queue_number = 0; queue_number < l2fwd_rx_queue_per_port; queue_number++) {
+        RTE_ETH_FOREACH_DEV(portid) {
+            /* skip ports that are not enabled */
+            if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
+                continue;
 
-        /* get the lcore_id for this port */
-        while (rte_lcore_is_enabled(rx_lcore_id) == 0 ||
-               lcore_queue_conf[rx_lcore_id].n_rx_port ==
-               l2fwd_rx_queue_per_lcore) {
-            rx_lcore_id++;
-            if (rx_lcore_id >= RTE_MAX_LCORE)
-                rte_exit(EXIT_FAILURE, "Not enough cores\n");
+            /* get the lcore_id for this port */
+            while (rte_lcore_is_enabled(rx_lcore_id) == 0 ||
+                   lcore_queue_conf[rx_lcore_id].n_rx_port ==
+                   l2fwd_rx_queue_per_lcore) {
+                rx_lcore_id++;
+                if (rx_lcore_id >= RTE_MAX_LCORE)
+                    rte_exit(EXIT_FAILURE, "Not enough cores\n");
+            }
+
+            if (qconf != &lcore_queue_conf[rx_lcore_id]) {
+                /* Assigned a new logical core in the loop above. */
+                qconf = &lcore_queue_conf[rx_lcore_id];
+                nb_lcores++;
+            }
+
+            qconf->rx_port_list[qconf->n_rx_port] = portid;
+            qconf->n_rx_port++;
+            printf("Lcore %u: RX port %u\n", rx_lcore_id, portid);
         }
-
-        if (qconf != &lcore_queue_conf[rx_lcore_id]) {
-            /* Assigned a new logical core in the loop above. */
-            qconf = &lcore_queue_conf[rx_lcore_id];
-            nb_lcores++;
-        }
-
-        qconf->rx_port_list[qconf->n_rx_port] = portid;
-        qconf->n_rx_port++;
-        printf("Lcore %u: RX port %u\n", rx_lcore_id, portid);
     }
 
     nb_mbufs = RTE_MAX(nb_ports * (nb_rxd + nb_txd + MAX_PKT_BURST +

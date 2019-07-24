@@ -287,11 +287,11 @@ l2fwd_main_loop(void)
                 rte_pktmbuf_free(pkts_burst[buf]);
         }
 
-        // Read back
-        const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
-        for (int i = 0; i < nb_rx; i++) {
-            rte_pktmbuf_free(pkts_read[i]);
-        }
+        // // Read back
+        // const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
+        // for (int i = 0; i < nb_rx; i++) {
+        //     rte_pktmbuf_free(pkts_read[i]);
+        // }
 
 
 
