@@ -159,6 +159,7 @@ print_stats(void)
 static void
 l2fwd_main_loop(struct fb *fb)
 {
+    printf("Starting l2fwd_main_loop");
     struct rte_mbuf *pkts_read[MAX_PKT_BURST];
     struct rte_mbuf *m;
     unsigned lcore_id;
@@ -208,6 +209,7 @@ l2fwd_main_loop(struct fb *fb)
 
             portid = qconf->rx_port_list[i];
             nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
+            printf("Reading %u packets\n", nb_rx);
 
             port_statistics[portid].rx += nb_rx;
 
