@@ -553,7 +553,7 @@ signal_handler(int signum)
 }
 
 int
-main(int argc, char **argv, struct fb *fb)
+net_listen(int argc, char **argv, struct fb *fb)
 {
     struct lcore_queue_conf *qconf;
     int ret;

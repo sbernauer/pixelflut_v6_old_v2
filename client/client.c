@@ -681,7 +681,7 @@ main(int argc, char **argv)
     qconf = NULL;
 
     /* Initialize the port/queue configuration of each logical core */
-    int queue_number;
+    unsigned int queue_number;
     for (queue_number = 0; queue_number < l2fwd_rx_queue_per_port; queue_number++) {
         RTE_ETH_FOREACH_DEV(portid) {
             /* skip ports that are not enabled */

@@ -5,7 +5,7 @@
 APP = pixelflut_v6
 
 # all source are stored in SRCS-y
-SRCS-y := network.c
+SRCS-y := framebuffer.c frontend.c llist.c main.c network.c vnc.c workqueue.c sdl.c
 
 # Build using pkg-config variables if possible
 $(shell pkg-config --exists libdpdk)
@@ -18,10 +18,11 @@ shared: build/$(APP)-shared
 static: build/$(APP)-static
 	ln -sf $(APP)-static build/$(APP)
 
-PC_FILE := $(shell pkg-config --path libdpdk)
-CFLAGS += -O3 $(shell pkg-config --cflags libdpdk)
-LDFLAGS_SHARED = $(shell pkg-config --libs libdpdk)
-LDFLAGS_STATIC = -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk)
+#DEPS = sdl2 libvncserver
+PC_FILE := $(shell pkg-config --path libdpdk sdl2 libvncserver)
+CFLAGS += -O3 $(shell pkg-config --cflags libdpdk sdl2 libvncserver)
+LDFLAGS_SHARED = $(shell pkg-config --libs libdpdk sdl2 libvncserver)
+LDFLAGS_STATIC = -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk sdl2 libvncserver)
 
 build/$(APP)-shared: $(SRCS-y) Makefile $(PC_FILE) | build
 	$(CC) $(CFLAGS) $(SRCS-y) -o $@ $(LDFLAGS) $(LDFLAGS_SHARED)
@@ -49,6 +50,8 @@ RTE_TARGET ?= $(notdir $(abspath $(dir $(firstword $(wildcard $(RTE_SDK)/*/.conf
 include $(RTE_SDK)/mk/rte.vars.mk
 
 CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -O3 $(shell pkg-config --cflags sdl2 libvncserver)
+LDFLAGS +=  $(shell pkg-config --libs sdl2 libvncserver)
 
 # workaround for a gcc bug with noreturn attribute
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=12603
