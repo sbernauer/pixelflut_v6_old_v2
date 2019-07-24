@@ -153,8 +153,6 @@ int main(int argc, char** argv) {
 		}
 		amountPixelflutParameters++;
 	}
-	amountPixelflutParameters++;
-	printf("amountPixelflutParameters: %u\n", amountPixelflutParameters);
 
 	while((opt = getopt(amountPixelflutParameters, argv, "w:h:r:s:l:f:d?")) != -1) {
 		switch(opt) {
@@ -290,6 +288,7 @@ int main(int argc, char** argv) {
 	// inaddr = (struct sockaddr_storage*)addr_list->ai_addr;
 	// addr_len = addr_list->ai_addrlen;
 
+	amountPixelflutParameters++;
 	argc -= amountPixelflutParameters;
 	argv += amountPixelflutParameters;
 	printf("Foo after moving aprametedr\n");
