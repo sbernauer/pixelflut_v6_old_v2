@@ -115,9 +115,9 @@ static void init_port(void) {
 	/* only set Rx queues: something we care only so far */
 	for (i = 0; i < nr_cores; i++) {
 		ret = rte_eth_rx_queue_setup(port_id, i, 512,
-					 rte_eth_dev_socket_id(port_id),
-					 &rxq_conf,
-					 mbuf_pool);
+				     rte_eth_dev_socket_id(port_id),
+				     &rxq_conf,
+				     mbuf_pool);
 		if (ret < 0) {
 			rte_exit(EXIT_FAILURE,
 				":: Rx queue setup failed: err=%d, port=%u\n",
@@ -276,21 +276,21 @@ int net_listen(int argc, char** argv, struct fb* fb) {
 			nr_ports, port_id);
 	}
 	mbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF, MBUF_CACHE_SIZE, 0,
-						RTE_MBUF_DEFAULT_BUF_SIZE,
-						rte_socket_id());
+					    RTE_MBUF_DEFAULT_BUF_SIZE,
+					    rte_socket_id());
 	if (mbuf_pool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
-	struct ether_addr* mac;
-	rte_eth_macaddr_get(0, mac);
-	printf("Port %u, MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
-			0,
-			mac->addr_bytes[0],
-			mac->addr_bytes[1],
-			mac->addr_bytes[2],
-			mac->addr_bytes[3],
-			mac->addr_bytes[4],
-			mac->addr_bytes[5]);
+	struct ether_addr mac; 
+	rte_eth_macaddr_get(0, &mac);
+    printf("Port %u, MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+            0,
+            mac.addr_bytes[0],
+            mac.addr_bytes[1],
+            mac.addr_bytes[2],
+            mac.addr_bytes[3],
+            mac.addr_bytes[4],
+            mac.addr_bytes[5]);
 
 	init_port();
 
