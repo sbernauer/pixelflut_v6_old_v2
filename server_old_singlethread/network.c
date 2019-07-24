@@ -32,12 +32,14 @@
 #include "llist.h"
 #include "util.h"
 
-#define RX_BURST_SIZE 2048
+#define RX_BURST_SIZE 128
+#define NB_MBUF (1024 * 8)
+#define MBUF_CACHE_SIZE 128
 
 static volatile int force_quit;
 
 static uint16_t port_id;
-static uint16_t nr_queues = 1; // TODO Increase if nic supports it
+static uint16_t nr_cores = 1; // TODO Increase if nic supports it
 struct rte_mempool *mbuf_pool;
 struct rte_flow *flow;
 
@@ -100,7 +102,7 @@ static void init_port(void) {
 	printf(":: initializing port: %d\n", port_id);
 	printf(":: configuring port: %d\n", port_id);
 	ret = rte_eth_dev_configure(port_id,
-				nr_queues, nr_queues, &port_conf);
+				nr_cores, nr_cores, &port_conf);
 	if (ret < 0) {
 		rte_exit(EXIT_FAILURE,
 			":: cannot configure device: err=%d, port=%u\n",
@@ -111,7 +113,7 @@ static void init_port(void) {
 	rxq_conf = dev_info.default_rxconf;
 	rxq_conf.offloads = port_conf.rxmode.offloads;
 	/* only set Rx queues: something we care only so far */
-	for (i = 0; i < nr_queues; i++) {
+	for (i = 0; i < nr_cores; i++) {
 		ret = rte_eth_rx_queue_setup(port_id, i, 512,
 				     rte_eth_dev_socket_id(port_id),
 				     &rxq_conf,
@@ -127,7 +129,7 @@ static void init_port(void) {
 	txq_conf = dev_info.default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
-	for (i = 0; i < nr_queues; i++) {
+	for (i = 0; i < nr_cores; i++) {
 		ret = rte_eth_tx_queue_setup(port_id, i, 512,
 				rte_eth_dev_socket_id(port_id),
 				&txq_conf);
@@ -154,7 +156,16 @@ static void init_port(void) {
 	printf(":: initializing port: %d done\n", port_id);
 }
 
-void *dpdk_thread(void *fb) {
+struct args
+{
+	int queue_id;
+	struct fb *fb;
+};
+
+void *dpdk_thread(struct args *args) {
+
+	int queue_id = args->queue_id;
+	struct fb *fb = args->fb;
 
 	struct rte_mbuf *mbufs[RX_BURST_SIZE];
 	struct ether_hdr *eth_hdr;
@@ -166,9 +177,22 @@ void *dpdk_thread(void *fb) {
 	uint16_t x, y;
 	uint32_t rgb;
 
+	uint32_t log_counter = 0;
+
 	while (!force_quit) {
-		for (i = 0; i < nr_queues; i++) {
-			nb_rx = rte_eth_rx_burst(port_id, i, mbufs, RX_BURST_SIZE);
+
+		log_counter++;
+		if (log_counter > 10000000) {
+			struct rte_eth_stats eth_stats;
+			RTE_ETH_FOREACH_DEV(i) {
+				rte_eth_stats_get(i, &eth_stats);
+				printf("Total number of packets received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+			}
+			log_counter = 0;
+		}
+
+		// for (i = 0; i < nr_queues; i++) {
+			nb_rx = rte_eth_rx_burst(port_id, queue_id, mbufs, RX_BURST_SIZE);
 			if (nb_rx) {
 				for (j = 0; j < nb_rx; j++) {
 					struct rte_mbuf *m = mbufs[j];
@@ -212,7 +236,7 @@ void *dpdk_thread(void *fb) {
 					rte_pktmbuf_free(m);
 				}
 			}
-		}
+		// }
 	}
 
 
@@ -251,7 +275,7 @@ int net_listen(int argc, char** argv, struct fb* fb) {
 		printf(":: warn: %d ports detected, but we use only one: port %u\n",
 			nr_ports, port_id);
 	}
-	mbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", 4096, 128, 0,
+	mbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF, MBUF_CACHE_SIZE, 0,
 					    RTE_MBUF_DEFAULT_BUF_SIZE,
 					    rte_socket_id());
 	if (mbuf_pool == NULL)
@@ -261,12 +285,24 @@ int net_listen(int argc, char** argv, struct fb* fb) {
 
 	printf("Initialized all ports\n");
 
-	pthread_t dpdk_thread_reference;
-	if(pthread_create(&dpdk_thread_reference, NULL, dpdk_thread, fb)) {
-		fprintf(stderr, "Error creating dpdk_thread thread\n");
-		return -1;
+	// pthread_t dpdk_thread_reference;
+	// if(pthread_create(&dpdk_thread_reference, NULL, dpdk_thread, fb)) {
+	// 	fprintf(stderr, "Error creating dpdk_thread thread\n");
+	// 	return -1;
+	// }
+	// printf("Created dpdk thread.\n");
+
+	unsigned int core_id_counter;
+	for (core_id_counter = 0; core_id_counter < nr_cores; core_id_counter++) {
+		struct args args;
+		args.fb=fb;
+		args.queue_id = core_id_counter;
+
+		rte_eal_remote_launch(dpdk_thread, &args, 3);
+		core_id_counter++;
 	}
-	printf("Created dpdk thread.\n");
+
+	printf("Created dpdk threads.\n");
 
 	return 0;
 }
