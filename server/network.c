@@ -559,8 +559,6 @@ net_listen(int argc, char **argv, struct fb* fb)
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
     printf("EAL consumed %i parameters\n", ret);
-    if (ret > 0)
-        ret --;
     argc -= ret;
     argv += ret;
 
