@@ -243,7 +243,7 @@ l2fwd_main_loop(void)
         }
         for(i  = 0; i < MAX_PKT_BURST; i++) {
             //eth_hdr = rte_pktmbuf_mtod(pkts_burst[i], struct ether_hdr *);
-            eth_hdr = (struct ether_hdr *)rte_pktmbuf_append(pkts_burst[i], sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr));
+            eth_hdr = (struct ether_hdr *)rte_pktmbuf_append(pkts_burst[i], sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr) + 8); // TODO Maybe update: Added 8 bytes UDP payload
             eth_hdr->ether_type = htons(ETHER_TYPE_IPv6);
             rte_memcpy(&(eth_hdr->s_addr), &saddr, sizeof(struct ether_addr));
             rte_memcpy(&(eth_hdr->d_addr), &daddr, sizeof(struct ether_addr));
@@ -251,6 +251,7 @@ l2fwd_main_loop(void)
             ipv6_hdr = rte_pktmbuf_mtod_offset(pkts_burst[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
             ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
             ipv6_hdr->hop_limits = 0xff;
+            ipv6_hdr->proto = 17; // UDP
 
             // Destination /64 IPv6 network
             ipv6_hdr->dst_addr[0] = 0x40;
@@ -292,6 +293,16 @@ l2fwd_main_loop(void)
             ipv6_hdr->dst_addr[13] = rgb >> 16;
             ipv6_hdr->dst_addr[14] = rgb >> 8;
             ipv6_hdr->dst_addr[15] = 0;
+
+            // UDO Header
+            ipv6_hdr->dst_addr[16] = 0; // Source port in UDP
+            ipv6_hdr->dst_addr[17] = 13;
+            ipv6_hdr->dst_addr[18] = 0; // Destination port in UDP
+            ipv6_hdr->dst_addr[19] = 42;
+            ipv6_hdr->dst_addr[20] = 0; // Length
+            ipv6_hdr->dst_addr[21] = 0;
+            ipv6_hdr->dst_addr[22] = 0; // Checksum (manditory at IPv6)
+            ipv6_hdr->dst_addr[23] = 0;
 
             x++;
             if (x > 900) {
