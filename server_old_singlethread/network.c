@@ -53,6 +53,27 @@ static inline void print_ip6_addr(const char *what, uint8_t *addr) {
 		what, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7],     addr[8], addr[9], addr[10], addr[11], addr[12], addr[13], addr[14], addr[15]);
 }
 
+#define CHECK_INTERVAL 1000  /* 100ms */
+#define MAX_REPEAT_TIMES 90  /* 9s (90 * 100ms) in total */
+
+static void
+assert_link_status(void)
+{
+	struct rte_eth_link link;
+	uint8_t rep_cnt = MAX_REPEAT_TIMES;
+
+	memset(&link, 0, sizeof(link));
+	do {
+		rte_eth_link_get(port_id, &link);
+		if (link.link_status == ETH_LINK_UP)
+			break;
+		rte_delay_ms(CHECK_INTERVAL);
+	} while (--rep_cnt);
+
+	if (link.link_status == ETH_LINK_DOWN)
+		rte_exit(EXIT_FAILURE, ":: error: link is still down\n");
+}
+
 static void signal_handler(int signum) {
 	if (signum == SIGINT || signum == SIGTERM) {
 		printf("\n\nSignal %d received, preparing to exit...\n",
@@ -149,7 +170,7 @@ static void init_port(void) {
 	}
 
 	printf(":: Asserting link is up for port: %d\n", port_id);
-	// TODO assert_link_status();
+	assert_link_status();
 
 	printf(":: initializing port: %d done\n", port_id);
 }
