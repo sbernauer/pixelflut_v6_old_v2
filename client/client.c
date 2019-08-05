@@ -87,7 +87,15 @@ static struct rte_eth_conf port_conf = {
     },
     .txmode = {
         .mq_mode = ETH_MQ_TX_NONE,
-    },
+    //     .offloads =
+    //         DEV_TX_OFFLOAD_VLAN_INSERT |
+    //         DEV_TX_OFFLOAD_IPV4_CKSUM  |
+    //         DEV_TX_OFFLOAD_UDP_CKSUM   |
+    //         DEV_TX_OFFLOAD_TCP_CKSUM   |
+    //         DEV_TX_OFFLOAD_SCTP_CKSUM  |
+    //         DEV_TX_OFFLOAD_TCP_TSO
+    //         // DEV_TX_OFFLOAD_CHECKSUM
+    }
 };
 
 struct rte_mempool * l2fwd_pktmbuf_pool = NULL;
@@ -175,7 +183,7 @@ l2fwd_main_loop(void)
     int sent;
     unsigned lcore_id;
     uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
-    unsigned i, j, portid, nb_rx;
+    unsigned i, j, portid, nb_rx, nb_tx;
     struct lcore_queue_conf *qconf;
     const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
             BURST_TX_DRAIN_US;
@@ -204,20 +212,20 @@ l2fwd_main_loop(void)
     struct ipv6_hdr *ipv6_hdr;
 
     struct ether_addr daddr;
-    daddr.addr_bytes[0] = 0xf8;
-    daddr.addr_bytes[1] = 0xb1;
-    daddr.addr_bytes[2] = 0x56;
-    daddr.addr_bytes[3] = 0xc0;
-    daddr.addr_bytes[4] = 0x37;
-    daddr.addr_bytes[5] = 0xba;
+    daddr.addr_bytes[0] = 0x00;
+    daddr.addr_bytes[1] = 0x1b;
+    daddr.addr_bytes[2] = 0x21;
+    daddr.addr_bytes[3] = 0x8b;
+    daddr.addr_bytes[4] = 0xe5;
+    daddr.addr_bytes[5] = 0x18;
 
     struct ether_addr saddr;
-    saddr.addr_bytes[0] = 0x28;
-    saddr.addr_bytes[1] = 0xf1;
-    saddr.addr_bytes[2] = 0x0e;
-    saddr.addr_bytes[3] = 0x26;
-    saddr.addr_bytes[4] = 0x3d;
-    saddr.addr_bytes[5] = 0xc7;
+    saddr.addr_bytes[0] = 0x00;
+    saddr.addr_bytes[1] = 0x1b;
+    saddr.addr_bytes[2] = 0x21;
+    saddr.addr_bytes[3] = 0x8b;
+    saddr.addr_bytes[4] = 0xe5;
+    saddr.addr_bytes[5] = 0x19;
 
     srand(time(NULL));
     int x = 100;
@@ -242,16 +250,34 @@ l2fwd_main_loop(void)
 
             ipv6_hdr = rte_pktmbuf_mtod_offset(pkts_burst[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
             ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
+            ipv6_hdr->hop_limits = 0xff;
 
             // Destination /64 IPv6 network
             ipv6_hdr->dst_addr[0] = 0x40;
             ipv6_hdr->dst_addr[1] = 0x00;
-            ipv6_hdr->dst_addr[2] = 0x42;
-            ipv6_hdr->dst_addr[3] = 0x00;
+            ipv6_hdr->dst_addr[2] = 0x00;
+            ipv6_hdr->dst_addr[3] = 0x42;
             ipv6_hdr->dst_addr[4] = 0;
             ipv6_hdr->dst_addr[5] = 0;
             ipv6_hdr->dst_addr[6] = 0;
             ipv6_hdr->dst_addr[7] = 0;
+
+            ipv6_hdr->src_addr[0] = 0xfe;
+            ipv6_hdr->src_addr[1] = 0x80;
+            ipv6_hdr->src_addr[2] = 0;
+            ipv6_hdr->src_addr[3] = 0;
+            ipv6_hdr->src_addr[4] = 0;
+            ipv6_hdr->src_addr[5] = 0;
+            ipv6_hdr->src_addr[6] = 0;
+            ipv6_hdr->src_addr[7] = 0;
+            ipv6_hdr->src_addr[8] = 0;
+            ipv6_hdr->src_addr[9] = 0;
+            ipv6_hdr->src_addr[10] = 0;
+            ipv6_hdr->src_addr[11] = 0;
+            ipv6_hdr->src_addr[12] = 0;
+            ipv6_hdr->src_addr[13] = 0;
+            ipv6_hdr->src_addr[14] = 0;
+            ipv6_hdr->src_addr[15] = 0x01;
 
             // X Coordinate
             ipv6_hdr->dst_addr[8] = x >> 8;
@@ -278,14 +304,21 @@ l2fwd_main_loop(void)
                 }
             }
         }
-        const uint16_t nb_tx = rte_eth_tx_burst(portid, 0, pkts_burst, MAX_PKT_BURST);
-        //printf("Send %u packets to port %u\n", nb_tx, portid);
+        do {
+            nb_tx = rte_eth_tx_burst(portid, 0, pkts_burst, MAX_PKT_BURST);
+            //printf("Send %u packets to port %u\n", nb_tx, portid);
+        } while(nb_tx == 0);
+
         if (unlikely(nb_tx < MAX_PKT_BURST)) {
+            //printf("ERROR cant send %lu packets.\n", MAX_PKT_BURST - nb_tx);
             uint16_t buf;
 
             for (buf = nb_tx; buf < MAX_PKT_BURST; buf++)
                 rte_pktmbuf_free(pkts_burst[buf]);
         }
+
+        // Dump one packet
+        // rte_pktmbuf_dump(stdout, pkts_burst[0], 1000);
 
         // // Read back
         // const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, MAX_PKT_BURST);
