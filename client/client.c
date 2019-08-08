@@ -223,9 +223,9 @@ l2fwd_main_loop(void)
     saddr.addr_bytes[0] = 0x00;
     saddr.addr_bytes[1] = 0x1b;
     saddr.addr_bytes[2] = 0x21;
-    saddr.addr_bytes[3] = 0x8b;
-    saddr.addr_bytes[4] = 0xe5;
-    saddr.addr_bytes[5] = 0x19;
+    saddr.addr_bytes[3] = 0x70;
+    saddr.addr_bytes[4] = 0x8a;
+    saddr.addr_bytes[5] = 0x88;
 
     srand(time(NULL));
     int x = 100;
@@ -251,7 +251,8 @@ l2fwd_main_loop(void)
             ipv6_hdr = rte_pktmbuf_mtod_offset(pkts_burst[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
             ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
             ipv6_hdr->hop_limits = 0xff;
-            ipv6_hdr->proto = 17; // UDP
+            ipv6_hdr->proto = 0x11; // UDP
+            ipv6_hdr->payload_len = 0x0800; // 8 byte, but applied endian conversion
 
             // Destination /64 IPv6 network
             ipv6_hdr->dst_addr[0] = 0x40;
