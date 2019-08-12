@@ -41,7 +41,7 @@
 
 static volatile bool force_quit;
 
-#define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
+#define RTE_LOGTYPE_PIXELFLUT_CLIENT RTE_LOGTYPE_USER1
 
 #define MAX_PKT_BURST 32
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
@@ -96,78 +96,9 @@ static struct rte_eth_conf port_conf = {
 
 struct rte_mempool * l2fwd_pktmbuf_pool = NULL;
 
-/* Per-port statistics struct */
-struct l2fwd_port_statistics {
-    uint64_t tx;
-    uint64_t rx;
-    uint64_t dropped;
-} __rte_cache_aligned;
-struct l2fwd_port_statistics port_statistics[RTE_MAX_ETHPORTS];
-
 #define MAX_TIMER_PERIOD 86400 /* 1 day max */
 /* A tsc-based timer responsible for triggering statistics printout */
 static uint64_t timer_period = 10; /* default period is 10 seconds */
-
-/* Print out statistics on packets dropped */
-static void
-print_stats(void)
-{
-    uint64_t total_packets_dropped, total_packets_tx, total_packets_rx;
-    unsigned portid;
-
-    total_packets_dropped = 0;
-    total_packets_tx = 0;
-    total_packets_rx = 0;
-
-    const char clr[] = { 27, '[', '2', 'J', '\0' };
-    const char topLeft[] = { 27, '[', '1', ';', '1', 'H','\0' };
-
-    /* Clear screen and move to top left */
-    // printf("%s%s", clr, topLeft);
-
-    printf("\nPort statistics ====================================");
-
-    for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
-        /* skip disabled ports */
-        if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-            continue;
-        printf("\nStatistics for port %u ------------------------------"
-               "\nPackets sent: %24"PRIu64
-               "\nPackets received: %20"PRIu64
-               "\nPackets dropped: %21"PRIu64,
-               portid,
-               port_statistics[portid].tx,
-               port_statistics[portid].rx,
-               port_statistics[portid].dropped);
-
-        total_packets_dropped += port_statistics[portid].dropped;
-        total_packets_tx += port_statistics[portid].tx;
-        total_packets_rx += port_statistics[portid].rx;
-    }
-    printf("\nAggregate statistics ==============================="
-           "\nTotal packets sent: %18"PRIu64
-           "\nTotal packets received: %14"PRIu64
-           "\nTotal packets dropped: %15"PRIu64,
-           total_packets_tx,
-           total_packets_rx,
-           total_packets_dropped);
-    printf("\n====================================================\n");
-}
-
-static void
-l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
-{
-    unsigned dst_port;
-    int sent;
-    struct rte_eth_dev_tx_buffer *buffer;
-
-    dst_port = l2fwd_dst_ports[portid];
-
-    buffer = tx_buffer[dst_port];
-    sent = rte_eth_tx_buffer(dst_port, 0, buffer, m);
-    if (sent)
-        port_statistics[dst_port].tx += sent;
-}
 
 /* main processing loop */
 static void
@@ -192,14 +123,14 @@ l2fwd_main_loop(void)
     qconf = &lcore_queue_conf[lcore_id];
 
     if (qconf->n_rx_port == 0) {
-        RTE_LOG(INFO, L2FWD, "lcore %u has nothing to do\n", lcore_id);
+        RTE_LOG(INFO, PIXELFLUT_CLIENT, "lcore %u has nothing to do\n", lcore_id);
         return;
     }
 
     for (i = 0; i < qconf->n_rx_port; i++) {
 
         portid = qconf->rx_port_list[i];
-        RTE_LOG(INFO, L2FWD, " -- lcoreid=%u portid=%u\n", lcore_id,
+        RTE_LOG(INFO, PIXELFLUT_CLIENT, " -- lcoreid=%u portid=%u\n", lcore_id,
             portid);
 
     }
@@ -353,8 +284,6 @@ l2fwd_main_loop(void)
                 buffer = tx_buffer[portid];
 
                 sent = rte_eth_tx_buffer_flush(portid, 0, buffer);
-                if (sent)
-                    port_statistics[portid].tx += sent;
 
             }
 
@@ -376,8 +305,6 @@ l2fwd_main_loop(void)
                             printf("Total number of packets for port %u: send %lu packets (%lu bytes), received %lu packets (%lu bytes), dropped rx %lu and rest= %lu, %lu, %lu\n", i, eth_stats.opackets, eth_stats.obytes, eth_stats.ipackets, eth_stats.ibytes, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
                         }
 
-
-                        print_stats();
                         /* reset the timer */
                         timer_tsc = 0;
                     }
@@ -814,9 +741,6 @@ main(int argc, char **argv)
 
         rte_eth_tx_buffer_init(tx_buffer[portid], MAX_PKT_BURST);
 
-        ret = rte_eth_tx_buffer_set_err_callback(tx_buffer[portid],
-                rte_eth_tx_buffer_count_callback,
-                &port_statistics[portid].dropped);
         if (ret < 0)
             rte_exit(EXIT_FAILURE,
             "Cannot set error callback for tx buffer on port %u\n",
@@ -841,8 +765,6 @@ main(int argc, char **argv)
                 l2fwd_ports_eth_addr[portid].addr_bytes[4],
                 l2fwd_ports_eth_addr[portid].addr_bytes[5]);
 
-        /* initialize port stats */
-        memset(&port_statistics, 0, sizeof(port_statistics));
     }
 
     if (!nb_ports_available) {
