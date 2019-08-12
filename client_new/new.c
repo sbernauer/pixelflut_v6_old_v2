@@ -12,9 +12,9 @@
 static uint64_t timer_period = 10; /* default period is 10 seconds */
 
 static volatile bool force_quit;
-static uint32_t l2fwd_enabled_port_mask = 0;
-static unsigned int l2fwd_rx_cores_per_port = 1;
-static unsigned int l2fwd_rx_queues_per_core = 1;
+static uint32_t port_mask = 0;
+static unsigned int rx_cores_per_port = 1;
+static unsigned int rx_queues_per_core = 1;
 
 /* print usage */
 static void
@@ -90,26 +90,26 @@ parse_args(int argc, char **argv)
 
         switch (opt) {
         case 'p':
-            l2fwd_enabled_port_mask = parse_portmask(optarg);
-            if (l2fwd_enabled_port_mask == 0) {
+            port_mask = parse_portmask(optarg);
+            if (port_mask == 0) {
                 printf("invalid portmask\n");
                 print_usage();
                 return -1;
             }
             break;
 
-        case 'q':
-            l2fwd_rx_cores_per_port = parse_nqueue(optarg);
-            if (l2fwd_rx_cores_per_port == 0) {
-                printf("invalid  number of cores per port\n");
+        case 'c':
+            rx_cores_per_port = parse_nqueue(optarg);
+            if (rx_cores_per_port == 0) {
+                printf("invalid number of cores per port\n");
                 print_usage();
                 return -1;
             }
             break;
 
-        case 'r':
-            l2fwd_rx_queues_per_core = parse_nqueue(optarg);
-            if (l2fwd_rx_queues_per_core == 0) {
+        case 'q':
+            rx_queues_per_core = parse_nqueue(optarg);
+            if (rx_queues_per_core == 0) {
                 printf("invalid number of queues per core\n");
                 print_usage();
                 return -1;
@@ -165,4 +165,8 @@ main(int argc, char** argv)
     ret = parse_args(argc, argv);
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Invalid pixelflut_v6_client arguments\n");
+
+    printf("DEBUG: port_mask: 0x%x\n", port_mask);
+    printf("DEBUG: rx_cores_per_port: %u\n", rx_cores_per_port);
+    printf("DEBUG: rx_queues_per_core: %u\n", rx_queues_per_core);
 }
