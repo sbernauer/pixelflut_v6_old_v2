@@ -219,7 +219,7 @@ static void init_port(unsigned int port_id) {
     port_conf.txmode.offloads &= dev_info.tx_offload_capa;
     printf(":: initializing port: %d\n", port_id);
     printf(":: configuring port: %d\n", port_id);
-    ret = rte_eth_dev_configure(port_id, 1, 1, &port_conf); // port_id, nb_rx_queue, nb_tx_queue, eth_conf
+    ret = rte_eth_dev_configure(port_id, rx_cores_per_port * rx_queues_per_core, 1, &port_conf); // port_id, nb_rx_queue, nb_tx_queue, eth_conf
     if (ret < 0) {
         rte_exit(EXIT_FAILURE, ":: cannot configure device: err=%d, port=%u\n", ret, port_id);
     }
@@ -229,7 +229,7 @@ static void init_port(unsigned int port_id) {
     rxq_conf.offloads = port_conf.rxmode.offloads;
 
     /* only set Rx queues: something we care only so far */
-    for (i = 0; i < 1; i++) { // TODO rx_cores_per_port * rx_queues_per_core
+    for (i = 0; i < rx_cores_per_port * rx_queues_per_core; i++) {
         ret = rte_eth_rx_queue_setup(port_id, i, 512, rte_eth_dev_socket_id(port_id), &rxq_conf, mbuf_pool);
         if (ret < 0) {
             rte_exit(EXIT_FAILURE, ":: Rx queue setup failed: err=%d, port=%u\n", ret, port_id);
@@ -262,12 +262,108 @@ static void init_port(unsigned int port_id) {
     printf(":: initializing port: %d done\n", port_id);
 }
 
-struct thread_args
+struct worker_thread_args
 {
     int port_id;
     int start_queue_id;
     struct fb *fb;
 };
+
+void *worker_thread(struct worker_thread_args *args) {
+
+    // Read args
+    int port_id = args->port_id;
+    int start_queue_id = args->start_queue_id;
+    struct fb *fb = args->fb;
+
+    struct rte_mbuf *mbufs[RX_BURST_SIZE];
+    struct ether_hdr *eth_hdr;
+    struct ipv4_hdr *ipv4_hdr;
+    struct ipv6_hdr *ipv6_hdr;
+    struct rte_flow_error error;
+    uint16_t nb_rx;
+    uint16_t i, queue_id;
+    uint16_t x, y;
+    uint32_t rgb;
+
+    uint32_t log_counter = 0;
+
+    while (!force_quit) {
+
+        log_counter++;
+        if (log_counter > 0) {
+            struct rte_eth_stats eth_stats;
+            RTE_ETH_FOREACH_DEV(i) {
+                rte_eth_stats_get(i, &eth_stats);
+                printf("Total number of packets for port %u received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", i, eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+            }
+            log_counter = 0;
+        }
+
+        for (queue_id = start_queue_id; queue_id < start_queue_id + rx_queues_per_core; queue_id++) {
+            nb_rx = rte_eth_rx_burst(port_id, queue_id, mbufs, RX_BURST_SIZE);
+            printf("nb_rx: %u\n", nb_rx);
+            if (nb_rx) {
+                for (i = 0; i < nb_rx; i++) {
+                    struct rte_mbuf *m = mbufs[i];
+
+                    eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
+                    // print_ether_addr("src=", &eth_hdr->s_addr);
+                    // print_ether_addr(" - dst=", &eth_hdr->d_addr);
+                    // printf(" - queue=0x%x", (unsigned int)i);
+
+                    if (eth_hdr->ether_type == rte_be_to_cpu_16(ETHER_TYPE_IPv6)) {
+                        printf("Found IPv6: ");
+                        ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr *, sizeof(struct ether_hdr));
+
+                        // if (ipv6_hdr->proto == 58) { // ICMP6
+                            //int icmp_type = *(&m + (sizeof(struct ether_hdr)));
+                            // uint8_t *icmp_type = rte_pktmbuf_mtod_offset(m, uint8_t*, sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr));
+                            // printf("Detected ICMP6 (Type: %u)", *icmp_type);
+                            // TODO Reply to ICMP6
+                        // }
+                        // Continuing without any restriction, client can send whatever type he wants
+
+                        uint8_t *dst = ipv6_hdr->dst_addr;
+                        // print_ip6_addr(" IpV6: src: ", ipv6_hdr->src_addr);
+                        // print_ip6_addr(" IpV6: dst: ", ipv6_hdr->dst_addr);
+
+                        x = (dst[8] << 8) + dst[9];
+                        y = (dst[10] << 8) + dst[11];
+                        rgb = (dst[12] << 24) + (dst[13] << 16) + (dst[14] << 8);
+                        printf(" --- x: %d y: %d rgb: %08x ---\n", x, y, rgb);
+                        //fb_set_pixel(fb, x, y, rgb);
+
+                    } else if (eth_hdr->ether_type == rte_be_to_cpu_16(ETHER_TYPE_IPv4)) {
+                        printf("Found IPv4: ");
+
+                        ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, sizeof(struct ether_hdr));
+                        // printf(" IPv4 src: %x dst: %x\n", ipv4_hdr->src_addr, ipv4_hdr->dst_addr);
+                    } else {
+                        printf("Unkown protocol: %d", eth_hdr->ether_type);
+                    }
+
+                    rte_pktmbuf_free(m);
+                }
+            }
+        }
+    }
+
+
+    struct rte_eth_stats eth_stats;
+    RTE_ETH_FOREACH_DEV(i) {
+        rte_eth_stats_get(i, &eth_stats);
+        printf("Total number of packets received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+    }
+
+
+    /* closing and releasing resources */
+    rte_flow_flush(port_id, &error);
+    rte_eth_dev_stop(port_id);
+    rte_eth_dev_close(port_id);
+
+    return NULL;
+}
 
 int
 main(int argc, char** argv)
@@ -328,16 +424,26 @@ main(int argc, char** argv)
     printf("Initialized all ports, launching threads\n");
 
 
+    unsigned int core_id_counter = 1;
     RTE_ETH_FOREACH_DEV(port_id) {
         /* skip ports that are not enabled */
         if ((port_mask & (1 << port_id)) == 0)
             continue;
 
-        unsigned int core_id_counter = 0;
         unsigned int queue_id_counter = 0;
-        for (core_id_counter = 0; core_id_counter < rx_cores_per_port; core_id_counter++) {
+        unsigned int i;
+        for (i = 0; i < rx_cores_per_port; i++) {
             printf("Launching on port %u, core %u and queue %u - %u (inclusive)\n", port_id, core_id_counter, queue_id_counter, queue_id_counter + rx_queues_per_core - 1);
+
+            struct worker_thread_args args;
+            // args.fb=fb; // TODO
+            args.port_id = port_id;
+            args.start_queue_id = queue_id_counter;
+
+            rte_eal_remote_launch(worker_thread, &args, core_id_counter);
+
             queue_id_counter += rx_queues_per_core;
+            core_id_counter++;
         }
     }
     printf("Launched all threads\n");
