@@ -219,7 +219,7 @@ static void init_port(unsigned int port_id) {
     port_conf.txmode.offloads &= dev_info.tx_offload_capa;
     printf(":: initializing port: %d\n", port_id);
     printf(":: configuring port: %d\n", port_id);
-    ret = rte_eth_dev_configure(port_id, rx_cores_per_port * rx_queues_per_core, 1, &port_conf); // port_id, nb_rx_queue, nb_tx_queue, eth_conf
+    ret = rte_eth_dev_configure(port_id, 1, 1, &port_conf); // port_id, nb_rx_queue, nb_tx_queue, eth_conf
     if (ret < 0) {
         rte_exit(EXIT_FAILURE, ":: cannot configure device: err=%d, port=%u\n", ret, port_id);
     }
@@ -229,7 +229,7 @@ static void init_port(unsigned int port_id) {
     rxq_conf.offloads = port_conf.rxmode.offloads;
 
     /* only set Rx queues: something we care only so far */
-    for (i = 0; i < rx_cores_per_port * rx_queues_per_core; i++) {
+    for (i = 0; i < 1; i++) { // TODO rx_cores_per_port * rx_queues_per_core
         ret = rte_eth_rx_queue_setup(port_id, i, 512, rte_eth_dev_socket_id(port_id), &rxq_conf, mbuf_pool);
         if (ret < 0) {
             rte_exit(EXIT_FAILURE, ":: Rx queue setup failed: err=%d, port=%u\n", ret, port_id);
@@ -262,6 +262,12 @@ static void init_port(unsigned int port_id) {
     printf(":: initializing port: %d done\n", port_id);
 }
 
+struct thread_args
+{
+    int port_id;
+    int start_queue_id;
+    struct fb *fb;
+};
 
 int
 main(int argc, char** argv)
@@ -319,6 +325,36 @@ main(int argc, char** argv)
         init_port(port_id);
     }
 
-    printf("All ports initialized\n");
+    printf("Initialized all ports, launching threads\n");
 
+
+    RTE_ETH_FOREACH_DEV(port_id) {
+        /* skip ports that are not enabled */
+        if ((port_mask & (1 << port_id)) == 0)
+            continue;
+
+        unsigned int core_id_counter = 0;
+        unsigned int queue_id_counter = 0;
+        for (core_id_counter = 0; core_id_counter < rx_cores_per_port; core_id_counter++) {
+            printf("Launching on port %u, core %u and queue %u - %u (inclusive)\n", port_id, core_id_counter, queue_id_counter, queue_id_counter + rx_queues_per_core - 1);
+            queue_id_counter += rx_queues_per_core;
+        }
+    }
+    printf("Launched all threads\n");
+
+
+    // unsigned int core_id_counter;
+    // unsigned int queue_id_counter;
+
+    // for (core_id_counter = 0; core_id_counter < nr_cores; core_id_counter++) {
+
+
+    // for (core_id_counter = 0; core_id_counter < nr_cores; core_id_counter++) {
+    //     struct thread_args args;
+    //     args.fb=fb;
+    //     args.queue_ids = core_id_counter;
+
+    //     rte_eal_remote_launch(dpdk_thread, &args, 3);
+    //     core_id_counter++;
+    // }
 }
