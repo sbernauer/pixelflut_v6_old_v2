@@ -34,9 +34,9 @@ static void
 print_usage()
 {
     printf("\npixelflut_v6_client [EAL options] -- -p PORTMASK\n"
-           "  -p PORTMASK: hexadecimal bitmask of ports to configure\n"
-           "  -c NQ: number of cores per port (default is 1)\n"
-           "  -q NQ: number of queus per core (default is 1)\n"
+           "  -p PORTMASK: hexadecimal bitmask of ports to configure (for example 0x3 for the last 2 ports)\n"
+           "  -c NUMBER: number of cores per port (default is 1)\n"
+           "  -q NUMBER: number of queus per core (default is 1)\n"
            "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 1 default, 86400 maximum)\n");
 }
 
