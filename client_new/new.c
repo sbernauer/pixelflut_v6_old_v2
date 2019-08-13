@@ -179,6 +179,8 @@ assert_link_status(unsigned int port_id)
 
     if (link.link_status == ETH_LINK_DOWN)
         rte_exit(EXIT_FAILURE, ":: error: link at port %u is still down\n", port_id);
+    else
+        printf("Port%d Link Up. Speed %u Mbps - %s\n", port_id, link.link_speed, (link.link_duplex == ETH_LINK_FULL_DUPLEX) ? ("full-duplex") : ("half-duplex\n"));
 }
 
 static void init_port(unsigned int port_id) {
@@ -421,7 +423,7 @@ main(int argc, char** argv)
         init_port(port_id);
     }
 
-    printf("Initialized all ports, launching threads\n");
+    printf("\nInitialized all ports, launching threads\n");
 
 
     unsigned int core_id_counter = 1;
