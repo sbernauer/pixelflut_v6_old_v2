@@ -29,7 +29,6 @@ int fb_alloc(struct fb** framebuffer, unsigned int width, unsigned int height) {
 	fb->numa_node = get_numa_node();
 	fb->list = LLIST_ENTRY_INIT;
 	fb->pixelCounter = 0;
-	fb->bytesCounter = 0;
 
 	*framebuffer = fb;
 	return 0;

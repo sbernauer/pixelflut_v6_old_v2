@@ -9,6 +9,6 @@
 #define likely(x)	__builtin_expect((x),1)
 #define unlikely(x)	__builtin_expect((x),0)
 
-int net_listen(int argc, char** argv, struct fb* fb);
+int net_listen(int argc, char** argv, struct fb* fb, bool force_quit);
 
 #endif

@@ -19,7 +19,6 @@ struct fb {
 	struct llist_entry list;
 
 	unsigned long long pixelCounter;
-	unsigned long long bytesCounter;
 };
 
 #define likely(x)	__builtin_expect((x),1)

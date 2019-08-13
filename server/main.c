@@ -36,7 +36,7 @@
 
 #define FONT "./zap-vga16.psf" //TODO Font must be freed again
 
-static bool do_exit = false;
+static volatile bool force_quit = false;
 
 extern struct frontend_id frontends[];
 
@@ -61,7 +61,7 @@ void show_frontends() {
 void doshutdown(int sig)
 {
 	printf("Shutting down\n");
-	do_exit = true;
+	force_quit = true;
 }
 
 void show_usage(char* binary) {
@@ -116,23 +116,6 @@ fail:
 	return err;
 }
 
-char **new_argv(int count, ...)
-{
-    va_list args;
-    int i;
-    char **argv = malloc((count+1) * sizeof(char*));
-    char *temp;
-    va_start(args, count);
-    for (i = 0; i < count; i++) {
-        temp = va_arg(args, char*);
-        argv[i] = malloc(sizeof(temp));
-        argv[i] = temp;
-    }
-    argv[i] = NULL;
-    va_end(args);
-    return argv;
-}
-
 int main(int argc, char** argv) {
 
 	int err, opt;
@@ -162,23 +145,30 @@ int main(int argc, char** argv) {
 	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0;
 	double loadAverages[3];
 
-	// unsigned int amountPixelflutParameters = 1;
-	// while(amountPixelflutParameters < argc) {
-	// 	printf("%s\n", argv[amountPixelflutParameters]);
-	// 	if (strcmp("--", argv[amountPixelflutParameters]) == 0) {
-	// 		break;
-	// 	}
-	// 	amountPixelflutParameters++;
-	// }
+	int arg_counter = 0;
+	while (arg_counter < argc) {
+		if (strcmp(argv[arg_counter], "--") == 0) {
+			break;
+		}
+		arg_counter++;
+	}
 
-	int tmp_argc = 3;
-	char** tmp_argv = new_argv(tmp_argc, "foobar", "-f", "vnc");
-	printf("TODO: Passed arguments following to pixelflut: %s %s\n", tmp_argv[1], tmp_argv[2]);
+	int tmp_argc = argc - arg_counter;
+	char** tmp_argv = argv + arg_counter;
+	// int tmp_argc = 3;
+	// char** tmp_argv = new_argv(tmp_argc, "foobar", "-f", "vnc");
+	printf("TODO: Passed arguments following to pixelflut: %s %s and arg_counter= %u\n", tmp_argv[1], tmp_argv[2], arg_counter);
 
 
-	while((opt = getopt(tmp_argc, tmp_argv, "w:h:r:s:l:f:d?")) != -1) {
-		printf("parsing...\n");
+	while((opt = getopt(tmp_argc, tmp_argv, "p:c:q:T:w:h:r:s:l:f:d?")) != -1) {
 		switch(opt) {
+			case('p'):
+			case('c'):
+			case('q'):
+			case('T'):
+				// Parameter that goes to network.c
+				break;
+
 			case('w'):
 				width = atoi(optarg);
 				if(width <= 0) {
@@ -277,7 +267,7 @@ int main(int argc, char** argv) {
 
 		if(strcmp(frontdef->name, "VNC server frontend") == 0) {
 			if((err=vnc_configure_font(front, FONT))) {
-				fprintf(stderr, "Could not register font %s for '%s'. Error: %i\n", FONT, frontdef->name, err);
+				fprintf(stderr, "Could not register font %s for '%s'\n", FONT, frontdef->name);
 				goto fail_fronts_free_name;
 			} else {
 				fprintf(stdout, "Registered font %s for '%s'\n", FONT, frontdef->name);
@@ -293,33 +283,30 @@ int main(int argc, char** argv) {
 	// 		err = -EINVAL;
 	// 		goto fail;
 	// 	}
-	// 	if(signal(SIGPIPE, SIG_IGN)) {
+	// 	if(signal(SIGKILL, doshutdown)) {
 	// 		fprintf(stderr, "Failed to bind signal\n");
 	// 		err = -EINVAL;
 	// 		goto fail;
 	// 	}
+	// 	if(signal(SIGTERM, doshutdown)) {
+	// 		fprintf(stderr, "Failed to bind signal\n");
+	// 		err = -EINVAL;
+	// 		goto fail;
+	// 	}
+	// // 	if(signal(SIGPIPE, SIG_IGN)) {
+	// // 		fprintf(stderr, "Failed to bind signal\n");
+	// // 		err = -EINVAL;
+	// // 		goto fail;
+	// // 	}
 	// }
 
-	// if((err = -getaddrinfo(listen_address, port, NULL, &addr_list))) {
-	// 	fprintf(stderr, "Failed to resolve listen address '%s', %d => %s\n", listen_address, err, gai_strerror(-err));
-	// 	goto fail_net;
-	// }
-
-	// inaddr = (struct sockaddr_storage*)addr_list->ai_addr;
-	// addr_len = addr_list->ai_addrlen;
-
-	// amountPixelflutParameters++;
-	// argc -= amountPixelflutParameters;
-	// argv += amountPixelflutParameters;
-	// printf("%u %s\n", argc, argv);
-	if((err = net_listen(argc, argv, fb))) {
+	if((err = net_listen(argc, argv, fb, force_quit))) {
 		fprintf(stderr, "Failed to start listening: %d => %s\n", err, strerror(-err));
 		goto fail;
 	}
-	printf("\n\n\n\n\n\n\nListening for packets...\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &fpsSnapshot);
-	while(!do_exit) {
+	while(!force_quit) {
 		clock_gettime(CLOCK_MONOTONIC, &before);
 		llist_for_each(&fronts, cursor) {
 			front = llist_entry_get_value(cursor, struct frontend, list);
@@ -345,16 +332,12 @@ int main(int argc, char** argv) {
 
 			actualPixelPerS = (fb->pixelCounter - pixelCounterPreviousSecond);
 			pixelCounterPreviousSecond = fb->pixelCounter;
-
-			actualBytesPerS = (fb->bytesCounter - bytesCounterPreviousSecond);
-			bytesCounterPreviousSecond = fb->bytesCounter;
-
+			
 			getloadavg(loadAverages, 3);
 
 			printf("Got fb->pixelCounter: %lld\n", fb->pixelCounter);
 			sprintf(textualInfo1, "FPS: %d Load: %3.1f %3.1f %3.1f", actualFps, loadAverages[0], loadAverages[1], loadAverages[2]);
-			sprintf(textualInfo2, "%.2f Gb/s %.1f GB received", (double)actualBytesPerS / (1024 * 1024 * 1024) * 8, (double)fb->bytesCounter / 1e9);
-			sprintf(textualInfo3, "%.2f M pixel/s %.1f k pixels", (double)actualPixelPerS / 1e6, (double)fb->pixelCounter / 1e3);
+			sprintf(textualInfo2, "%.2f M pixel/s %.1f M pixels", (double)actualPixelPerS / 1e6, (double)fb->pixelCounter / 1e6);
 
 			fpsSnapshot = after;
 		}
