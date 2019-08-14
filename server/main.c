@@ -346,7 +346,7 @@ int main(int argc, char** argv) {
 			actualPacketsCounterErrors = 0;
 			actualBytesCounter = 0;
 			for (int i = 0; i < nb_ports; i++) {
-				rte_eth_stats_get(0, &eth_stats);
+				rte_eth_stats_get(i, &eth_stats);
 				actualPacketsCounter += (eth_stats.ipackets + eth_stats.imissed);
 				actualPacketsCounterMissed += eth_stats.imissed;
 				actualPacketsCounterErrors += eth_stats.ierrors;
