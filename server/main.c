@@ -14,6 +14,9 @@
 #include <time.h>
 #include <sys/sysinfo.h>
 
+#include <rte_ether.h>
+#include <rte_ethdev.h>
+
 #include "framebuffer.h"
 #include "sdl.h"
 #include "vnc.h"
@@ -139,11 +142,17 @@ int main(int argc, char** argv) {
 	char* textualInfo1 = calloc(100, sizeof(char));
 	char* textualInfo2 = calloc(100, sizeof(char));
 	char* textualInfo3 = calloc(100, sizeof(char));
+	char* textualInfo4 = calloc(100, sizeof(char));
 	unsigned int fpsCounter = 0;
 	unsigned int actualFps = 0;
 	unsigned long pixelCounterPreviousSecond = 0, actualPixelPerS = 0;
-	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0;
+	unsigned long packetsCounterPreviousSecond = 0, actualPacketsPerS = 0, actualPacketsCounter = 0, actualPacketsCounterMissed = 0;
+	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0, actualBytesCounter = 0;
 	double loadAverages[3];
+
+	// Port statistics
+	int nb_ports;
+	struct rte_eth_stats eth_stats;
 
 	int arg_counter = 0;
 	while (arg_counter < argc) {
@@ -304,6 +313,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Failed to start listening: %d => %s\n", err, strerror(-err));
 		goto fail;
 	}
+	nb_ports = rte_eth_dev_count_avail();
 
 	clock_gettime(CLOCK_MONOTONIC, &fpsSnapshot);
 	while(!force_quit) {
@@ -311,10 +321,11 @@ int main(int argc, char** argv) {
 		llist_for_each(&fronts, cursor) {
 			front = llist_entry_get_value(cursor, struct frontend, list);
 			if(showTextualInfo && frontend_can_draw_string(front)) {
-				frontend_draw_string(front, 10, 45, textualInfo3); // Draw from botton to top because fragments appear above the text, so we overwrite them
+				frontend_draw_string(front, 10, 60, textualInfo4); // Draw from botton to top because fragments appear above the text, so we overwrite them
+				frontend_draw_string(front, 10, 45, textualInfo3);
 				frontend_draw_string(front, 10, 30, textualInfo2);
 				frontend_draw_string(front, 10, 15, textualInfo1);
-				frontend_draw_string(front, 10, 0, "PIXELFLUT: 127.0.0.1:1234 DECT 1234");
+				frontend_draw_string(front, 10, 0, "PIXELFLUT_V6: 4000:42::/64 DECT 1234");
 			}
 			if((err = frontend_update(front))) {
 				fprintf(stderr, "Failed to update frontend '%s', %d => %s, bailing out\n", front->def->name, err, strerror(-err));
@@ -330,14 +341,30 @@ int main(int argc, char** argv) {
 			actualFps = fpsCounter;
 			fpsCounter = 0;
 
+			actualPacketsCounter = 0;
+			actualPacketsCounterMissed = 0;
+			actualBytesCounter = 0;
+			for (int i = 0; i < nb_ports; i++) {
+				rte_eth_stats_get(0, &eth_stats);
+				actualPacketsCounter += (eth_stats.ipackets + eth_stats.imissed);
+				actualPacketsCounterMissed += eth_stats.imissed;
+				actualBytesCounter += eth_stats.ibytes;
+			}
+
 			actualPixelPerS = (fb->pixelCounter - pixelCounterPreviousSecond);
+			actualPacketsPerS = (actualPacketsCounter - packetsCounterPreviousSecond);
+			actualBytesPerS = (actualBytesCounter - bytesCounterPreviousSecond);
 			pixelCounterPreviousSecond = fb->pixelCounter;
+			packetsCounterPreviousSecond = actualPacketsCounter;
+			bytesCounterPreviousSecond = actualBytesCounter;
 			
 			getloadavg(loadAverages, 3);
 
 			printf("Got fb->pixelCounter: %lld\n", fb->pixelCounter);
 			sprintf(textualInfo1, "FPS: %d Load: %3.1f %3.1f %3.1f", actualFps, loadAverages[0], loadAverages[1], loadAverages[2]);
 			sprintf(textualInfo2, "%.2f M pixel/s %.1f M pixels", (double)actualPixelPerS / 1e6, (double)fb->pixelCounter / 1e6);
+			sprintf(textualInfo3, "%.2f M packets/s %.1f M packets (%.1f M missed)", (double)actualPacketsPerS / 1e6, (double)actualPacketsCounter / 1e6, (double)actualPacketsCounterMissed / 1e6);
+			sprintf(textualInfo4, "%.2f Gb/s %.1f GB received", (double)actualBytesPerS / (1024 * 1024 * 1024) * 8, (double)actualBytesCounter / 1e9);
 
 			fpsSnapshot = after;
 		}

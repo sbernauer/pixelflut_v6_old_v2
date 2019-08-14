@@ -317,6 +317,7 @@ void *worker_thread(struct worker_thread_args *args) {
     uint32_t log_counter = 0;
 
     while (!force_quit) {
+//        usleep(100);
 
         log_counter++;
         if (log_counter > 100000000) {
@@ -421,8 +422,9 @@ net_listen(int argc, char** argv, struct fb* fb, bool do_exit)
 
     /* Check if any port is present */
     nb_ports = rte_eth_dev_count_avail();
-    if (nb_ports == 0)
-        rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
+    printf("Found %u ports\n", nb_ports);
+    // if (nb_ports == 0)
+    //     rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
 
     /* check port mask to possible port mask */
     if (port_mask & ~((1 << nb_ports) - 1))
