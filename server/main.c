@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
 	unsigned int fpsCounter = 0;
 	unsigned int actualFps = 0;
 	unsigned long pixelCounterPreviousSecond = 0, actualPixelPerS = 0;
-	unsigned long packetsCounterPreviousSecond = 0, actualPacketsPerS = 0, actualPacketsCounter = 0, actualPacketsCounterMissed = 0;
+	unsigned long packetsCounterPreviousSecond = 0, actualPacketsPerS = 0, actualPacketsCounter = 0, actualPacketsCounterMissed = 0, actualPacketsCounterErrors = 0;
 	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0, actualBytesCounter = 0;
 	double loadAverages[3];
 
@@ -343,11 +343,13 @@ int main(int argc, char** argv) {
 
 			actualPacketsCounter = 0;
 			actualPacketsCounterMissed = 0;
+			actualPacketsCounterErrors = 0;
 			actualBytesCounter = 0;
 			for (int i = 0; i < nb_ports; i++) {
 				rte_eth_stats_get(0, &eth_stats);
 				actualPacketsCounter += (eth_stats.ipackets + eth_stats.imissed);
 				actualPacketsCounterMissed += eth_stats.imissed;
+				actualPacketsCounterErrors += eth_stats.ierrors;
 				actualBytesCounter += eth_stats.ibytes;
 			}
 
@@ -363,7 +365,7 @@ int main(int argc, char** argv) {
 			printf("Got fb->pixelCounter: %lld\n", fb->pixelCounter);
 			sprintf(textualInfo1, "FPS: %d Load: %3.1f %3.1f %3.1f", actualFps, loadAverages[0], loadAverages[1], loadAverages[2]);
 			sprintf(textualInfo2, "%.2f M pixel/s %.1f M pixels", (double)actualPixelPerS / 1e6, (double)fb->pixelCounter / 1e6);
-			sprintf(textualInfo3, "%.2f M packets/s %.1f M packets (%.1f M missed)", (double)actualPacketsPerS / 1e6, (double)actualPacketsCounter / 1e6, (double)actualPacketsCounterMissed / 1e6);
+			sprintf(textualInfo3, "%.2f M packets/s %.1f M packets (%.1f M missed) (%.1f M errors)", (double)actualPacketsPerS / 1e6, (double)actualPacketsCounter / 1e6, (double)actualPacketsCounterMissed / 1e6, (double)actualPacketsCounterErrors / 1e6);
 			sprintf(textualInfo4, "%.2f Gb/s %.1f GB received", (double)actualBytesPerS / (1024 * 1024 * 1024) * 8, (double)actualBytesCounter / 1e9);
 
 			fpsSnapshot = after;
