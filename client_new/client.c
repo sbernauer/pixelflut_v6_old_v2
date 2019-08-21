@@ -309,7 +309,7 @@ void *worker_thread(struct worker_thread_args *args) {
             struct rte_eth_stats eth_stats;
             /* skip ports that are not enabled */
             rte_eth_stats_get(port_id, &eth_stats);
-            printf("Total number of packets for port %u received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", port_id, eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+            printf("Total number of packets for port %u send %lu received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", port_id, eth_stats.opackets, eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
             log_counter = 0;
         }
 
