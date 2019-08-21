@@ -366,7 +366,7 @@ void *worker_thread(struct worker_thread_args *args) {
     struct rte_eth_stats eth_stats;
     RTE_ETH_FOREACH_DEV(i) {
         rte_eth_stats_get(i, &eth_stats);
-        printf("Total number of packets received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+        printf("Total number of packets send %u received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", eth_stats.opackets, eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
     }
 
 
