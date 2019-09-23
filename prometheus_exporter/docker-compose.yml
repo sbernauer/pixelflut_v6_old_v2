@@ -1,0 +1,23 @@
+version: '3'
+services:
+  node_exporter:
+    image: "prom/node-exporter"
+    command: "--collector.textfile.directory /var/lib/node_exporter/textfile_collector"
+    ports:
+      - "9100:9100"
+    volumes:
+      - "/etc/pixelflut_v6_statistics.txt:/var/lib/node_exporter/textfile_collector/pixelflut_v6_statistics.prom"
+
+  prometheus:
+    image: "prom/prometheus"
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./pixelflut_v6_prometheus.yml:/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: "grafana/grafana"
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./grafana_data:/var/lib/grafana"
