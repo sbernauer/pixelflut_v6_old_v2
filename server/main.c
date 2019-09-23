@@ -145,9 +145,9 @@ int main(int argc, char** argv) {
 	char* textualInfo4 = calloc(100, sizeof(char));
 	unsigned int fpsCounter = 0;
 	unsigned int actualFps = 0;
-	unsigned long pixelCounterPreviousSecond = 0, actualPixelPerS = 0;
-	unsigned long packetsCounterPreviousSecond = 0, actualPacketsPerS = 0, actualPacketsCounter = 0, actualPacketsCounterMissed = 0, actualPacketsCounterErrors = 0;
-	unsigned long bytesCounterPreviousSecond = 0, actualBytesPerS = 0, actualBytesCounter = 0;
+	unsigned long long pixelCounterPreviousSecond = 0, actualPixelPerS = 0;
+	unsigned long long packetsCounterPreviousSecond = 0, actualPacketsPerS = 0, actualPacketsCounter = 0, actualPacketsCounterMissed = 0, actualPacketsCounterErrors = 0;
+	unsigned long long bytesCounterPreviousSecond = 0, actualBytesPerS = 0, actualBytesCounter = 0;
 	double loadAverages[3];
 
 	// Port statistics
@@ -359,7 +359,7 @@ int main(int argc, char** argv) {
 			pixelCounterPreviousSecond = fb->pixelCounter;
 			packetsCounterPreviousSecond = actualPacketsCounter;
 			bytesCounterPreviousSecond = actualBytesCounter;
-			
+
 			getloadavg(loadAverages, 3);
 
 			printf("Got fb->pixelCounter: %lld\n", fb->pixelCounter);
@@ -367,6 +367,18 @@ int main(int argc, char** argv) {
 			sprintf(textualInfo2, "%.2f M pixel/s %.1f M pixels", (double)actualPixelPerS / 1e6, (double)fb->pixelCounter / 1e6);
 			sprintf(textualInfo3, "%.2f M packets/s %.1f M packets (%.1f M missed) (%.1f M errors)", (double)actualPacketsPerS / 1e6, (double)actualPacketsCounter / 1e6, (double)actualPacketsCounterMissed / 1e6, (double)actualPacketsCounterErrors / 1e6);
 			sprintf(textualInfo4, "%.2f Gb/s %.1f GB received", (double)actualBytesPerS / (1024 * 1024 * 1024) * 8, (double)actualBytesCounter / 1e9);
+
+			FILE *f = fopen("/etc/pixelflut_v6_statistics.txt", "w");
+			if (f == NULL) {
+			    printf("Error opening file /etc/pixelflut_v6_statistics.txt\n");
+			    exit(1);
+			}
+			fprintf(f, "pixelflut_v6_packets: %llu\n", actualPacketsCounter);
+			fprintf(f, "pixelflut_v6_packets_missed: %llu\n", actualPacketsCounterMissed);
+			fprintf(f, "pixelflut_v6_packets_errors: %llu\n", actualPacketsCounterErrors);
+			fprintf(f, "pixelflut_v6_bytes: %llu\n",  actualBytesCounter);
+			fprintf(f, "pixelflut_v6_pixels: %llu\n",  fb->pixelCounter);
+			fclose(f);
 
 			fpsSnapshot = after;
 		}
