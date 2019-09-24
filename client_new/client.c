@@ -16,10 +16,12 @@
 
 #define MAX_RX_QUEUE_PER_LCORE 16
 #define MAX_TIMER_PERIOD 86400 /* 1 day max */
-#define RX_BURST_SIZE 32
+#define BURST_SIZE 32
 #define NB_MBUF (1024 * 8)
 #define MBUF_CACHE_SIZE 128
 #define PACKET_DESCRIPTORS 1024
+#define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
+
 
 static uint64_t timer_period = 1; /* default period is 1 second */
 
@@ -169,16 +171,6 @@ parse_args(int argc, char **argv)
     return 0;
 }
 
-static void
-signal_handler(int signum)
-{
-    if (signum == SIGINT || signum == SIGTERM) {
-        printf("\n\nSignal %d received, preparing to exit...\n",
-                signum);
-        force_quit = true;
-    }
-}
-
 #define CHECK_INTERVAL 100  /* 100ms */
 #define MAX_REPEAT_TIMES 10  /* 9s (90 * 100ms) in total */
 
@@ -299,33 +291,170 @@ void *worker_thread(struct worker_thread_args *args) {
     int port_id = args->port_id;
     int start_queue_id = args->start_queue_id;
 
-    struct rte_mbuf *mbufs[RX_BURST_SIZE];
-    struct ether_hdr *eth_hdr;
-    struct ipv4_hdr *ipv4_hdr;
-    struct ipv6_hdr *ipv6_hdr;
+    struct rte_mbuf *mbufs_transmit[BURST_SIZE];
     struct rte_flow_error error;
-    uint16_t nb_rx;
+    uint16_t nb_tx;
     uint16_t i, queue_id;
-    uint16_t x, y;
-    uint32_t rgb;
 
     uint32_t log_counter = 0;
 
+    struct ether_hdr *eth_hdr;
+    struct ipv6_hdr *ipv6_hdr;
+
+    struct ether_addr daddr;
+    daddr.addr_bytes[0] = 0x00;
+    daddr.addr_bytes[1] = 0x1b;
+    daddr.addr_bytes[2] = 0x21;
+    daddr.addr_bytes[3] = 0x8b;
+    daddr.addr_bytes[4] = 0xe5;
+    daddr.addr_bytes[5] = 0x18;
+
+    struct ether_addr saddr;
+    saddr.addr_bytes[0] = 0x00;
+    saddr.addr_bytes[1] = 0x1b;
+    saddr.addr_bytes[2] = 0x21;
+    saddr.addr_bytes[3] = 0x70;
+    saddr.addr_bytes[4] = 0x8a;
+    saddr.addr_bytes[5] = 0x88;
+
+    srand(time(NULL));
+    int x = 100;
+    int y = 100;
+    uint32_t rgb = rand();
+
+
     while (!force_quit) {
-//        usleep(100);
+
+
+        if(rte_pktmbuf_alloc_bulk(mbuf_pool, mbufs_transmit, BURST_SIZE)!=0) {
+            printf("Allocation problem\n");
+        }
+        for(i  = 0; i < BURST_SIZE; i++) {
+            //eth_hdr = rte_pktmbuf_mtod(mbufs_transmit[i], struct ether_hdr *);
+            eth_hdr = (struct ether_hdr *)rte_pktmbuf_append(mbufs_transmit[i], sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr) + 8); // TODO Maybe update: Added 8 bytes UDP payload
+            eth_hdr->ether_type = htons(ETHER_TYPE_IPv6);
+            rte_memcpy(&(eth_hdr->s_addr), &saddr, sizeof(struct ether_addr));
+            rte_memcpy(&(eth_hdr->d_addr), &daddr, sizeof(struct ether_addr));
+
+            ipv6_hdr = rte_pktmbuf_mtod_offset(mbufs_transmit[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
+            ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
+            ipv6_hdr->hop_limits = 0xff;
+            ipv6_hdr->proto = 0x11; // UDP
+            ipv6_hdr->payload_len = 0x0800; // 8 byte, but applied endian conversion
+
+            // Destination /64 IPv6 network
+            ipv6_hdr->dst_addr[0] = 0x40;
+            ipv6_hdr->dst_addr[1] = 0x00;
+            ipv6_hdr->dst_addr[2] = 0x00;
+            ipv6_hdr->dst_addr[3] = 0x42;
+            ipv6_hdr->dst_addr[4] = 0;
+            ipv6_hdr->dst_addr[5] = 0;
+            ipv6_hdr->dst_addr[6] = 0;
+            ipv6_hdr->dst_addr[7] = 0;
+
+            ipv6_hdr->src_addr[0] = 0xfe;
+            ipv6_hdr->src_addr[1] = 0x80;
+            ipv6_hdr->src_addr[2] = 0;
+            ipv6_hdr->src_addr[3] = 0;
+            ipv6_hdr->src_addr[4] = 0;
+            ipv6_hdr->src_addr[5] = 0;
+            ipv6_hdr->src_addr[6] = 0;
+            ipv6_hdr->src_addr[7] = 0;
+            ipv6_hdr->src_addr[8] = 0;
+            ipv6_hdr->src_addr[9] = 0;
+            ipv6_hdr->src_addr[10] = 0;
+            ipv6_hdr->src_addr[11] = 0;
+            ipv6_hdr->src_addr[12] = 0;
+            ipv6_hdr->src_addr[13] = 0;
+            ipv6_hdr->src_addr[14] = 0;
+            ipv6_hdr->src_addr[15] = 0x01;
+
+            // X Coordinate
+            ipv6_hdr->dst_addr[8] = x >> 8;
+            ipv6_hdr->dst_addr[9] = x;
+
+            // Y Coordinate
+            ipv6_hdr->dst_addr[10] = y >> 8;
+            ipv6_hdr->dst_addr[11] = y;
+
+            // Color in rgb
+            ipv6_hdr->dst_addr[12] = rgb >> 24;
+            ipv6_hdr->dst_addr[13] = rgb >> 16;
+            ipv6_hdr->dst_addr[14] = rgb >> 8;
+            ipv6_hdr->dst_addr[15] = 0;
+
+            // UDO Header
+            ipv6_hdr->dst_addr[16] = 0; // Source port in UDP
+            ipv6_hdr->dst_addr[17] = 13;
+            ipv6_hdr->dst_addr[18] = 0; // Destination port in UDP
+            ipv6_hdr->dst_addr[19] = 42;
+            ipv6_hdr->dst_addr[20] = 0; // Length
+            ipv6_hdr->dst_addr[21] = 0;
+            ipv6_hdr->dst_addr[22] = 0; // Checksum (manditory at IPv6)
+            ipv6_hdr->dst_addr[23] = 0;
+
+            x++;
+            if (x > 900) {
+                x = 100;
+                y++;
+                if (y > 700) {
+                    y = 100;
+                    //srand(time(NULL));
+                    rgb = rand();
+                }
+            }
+        }
+        do {
+            nb_tx = rte_eth_tx_burst(port_id, queue_id, mbufs_transmit, BURST_SIZE);
+            //printf("Send %u packets to port %u\n", nb_tx, portid);
+        } while(nb_tx == 0);
+
+        if (unlikely(nb_tx < BURST_SIZE)) {
+            //printf("ERROR cant send %lu packets.\n", BURST_SIZE - nb_tx);
+            uint16_t buf;
+
+            for (buf = nb_tx; buf < BURST_SIZE; buf++)
+                rte_pktmbuf_free(mbufs_transmit[buf]);
+        }
+
+        // Dump one packet
+        // rte_pktmbuf_dump(stdout, pkts_burst[0], 1000);
+
+        // // Read back
+        // const uint16_t nb_rx = rte_eth_rx_burst(portid, 0, pkts_read, BURST_SIZE);
+        // for (int i = 0; i < nb_rx; i++) {
+        //     rte_pktmbuf_free(pkts_read[i]);
+        // }
 
         log_counter++;
-        if (log_counter > 100000000) {
-            struct rte_eth_stats eth_stats;
-            /* skip ports that are not enabled */
-            rte_eth_stats_get(port_id, &eth_stats);
-            printf("Total number of packets for port %u send %lu, received %lu, dropped rx full %lu and rest= %lu, %lu, %lu\n", port_id, eth_stats.opackets, eth_stats.ipackets, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+        if (unlikely(log_counter > 10000)) {
             log_counter = 0;
+
+            struct rte_eth_stats eth_stats;
+            RTE_ETH_FOREACH_DEV(i) {
+                rte_eth_stats_get(i, &eth_stats);
+                printf("Total number of packets for port %u: send %lu packets (%lu bytes), received %lu packets (%lu bytes), dropped rx %lu and rest= %lu, %lu, %lu\n", i, eth_stats.opackets, eth_stats.obytes, eth_stats.ipackets, eth_stats.ibytes, eth_stats.imissed, eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[0]);
+            }
         }
 
-        for (queue_id = start_queue_id; queue_id < start_queue_id + queues_per_core; queue_id++) {
 
-        }
+        // /*
+        //  * Read packet from RX queues
+        //  */
+        // for (i = 0; i < qconf->n_rx_port; i++) {
+
+        //  portid = qconf->rx_port_list[i];
+        //  nb_rx = rte_eth_rx_burst(portid, 0,
+        //               pkts_burst, MAX_PKT_BURST);
+
+        //  port_statistics[portid].rx += nb_rx;
+
+        //  for (j = 0; j < nb_rx; j++) {
+        //      m = pkts_burst[j];
+        //      rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+        //      l2fwd_simple_forward(m, portid);
+        //  }
+        // }
     }
 
 
