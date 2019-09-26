@@ -7,6 +7,7 @@ services:
       - "9100:9100"
     volumes:
       - "/etc/pixelflut_v6_statistics.txt:/var/lib/node_exporter/textfile_collector/pixelflut_v6_statistics.prom"
+    network_mode: "host" # To get network statistics for all interface
 
   prometheus:
     image: "prom/prometheus"
