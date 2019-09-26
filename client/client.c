@@ -39,11 +39,14 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 static volatile bool force_quit;
 
-// TODO unused parameter
-/* MAC updating enabled by default */
-static int mac_updating = 1;
+static char* imageName = "image.png"; // Default value
+static uint32_t* image;
+static int image_width, image_height, image_bpp;
 
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
@@ -227,10 +230,9 @@ l2fwd_main_loop(void)
     saddr.addr_bytes[4] = 0x8a;
     saddr.addr_bytes[5] = 0x88;
 
-    srand(time(NULL));
-    int x = 100;
-    int y = 100;
-    uint32_t rgb = rand();
+    int x = 0;
+    int y = 0;
+    uint32_t rgb = 0;
 
     while (!force_quit) {
 
@@ -290,9 +292,10 @@ l2fwd_main_loop(void)
             ipv6_hdr->dst_addr[11] = y;
 
             // Color in rgb
-            ipv6_hdr->dst_addr[12] = rgb >> 24;
-            ipv6_hdr->dst_addr[13] = rgb >> 16;
-            ipv6_hdr->dst_addr[14] = rgb >> 8;
+            rgb = image[x + y * image_width];
+            ipv6_hdr->dst_addr[12] = rgb;
+            ipv6_hdr->dst_addr[13] = rgb >> 8;
+            ipv6_hdr->dst_addr[14] = rgb >> 16;
             ipv6_hdr->dst_addr[15] = 0;
 
             // UDO Header
@@ -306,13 +309,11 @@ l2fwd_main_loop(void)
             ipv6_hdr->dst_addr[23] = 0;
 
             x++;
-            if (x > 900) {
-                x = 100;
+            if (x >= image_width) {
+                x = 0;
                 y++;
-                if (y > 700) {
-                    y = 100;
-                    //srand(time(NULL));
-                    rgb = rand();
+                if (y >= image_height) {
+                    y = 0;
                 }
             }
         }
@@ -490,6 +491,7 @@ static const char short_options[] =
     "q:"  /* number of queues per lcore */
     "r:"  /* number of queues per port */
     "T:"  /* timer period */
+    "i:"  /* image file */
     ;
 
 #define CMD_LINE_OPT_MAC_UPDATING "mac-updating"
@@ -504,8 +506,6 @@ enum {
 };
 
 static const struct option lgopts[] = {
-    { CMD_LINE_OPT_MAC_UPDATING, no_argument, &mac_updating, 1},
-    { CMD_LINE_OPT_NO_MAC_UPDATING, no_argument, &mac_updating, 0},
     {NULL, 0, 0, 0}
 };
 
@@ -565,8 +565,9 @@ l2fwd_parse_args(int argc, char **argv)
             timer_period = timer_secs;
             break;
 
-        /* long options */
-        case 0:
+        /* iamge file */
+        case 'i':
+            imageName = optarg;
             break;
 
         default:
@@ -681,7 +682,9 @@ main(int argc, char **argv)
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Invalid L2FWD arguments\n");
 
-    printf("MAC updating %s\n", mac_updating ? "enabled" : "disabled");
+    printf("Loading image %s\n", imageName);
+    image = stbi_load(imageName, &image_width, &image_height, &image_bpp, 4);
+    fprintf(stdout, "Width: %u height %u bpp %u\n", image_width, image_height, image_bpp);
 
     /* convert to number of cycles */
     timer_period *= rte_get_timer_hz();
@@ -888,6 +891,9 @@ main(int argc, char **argv)
         rte_eth_dev_close(portid);
         printf(" Done\n");
     }
+
+    stbi_image_free(image);
+
     printf("Bye...\n");
 
     return ret;
