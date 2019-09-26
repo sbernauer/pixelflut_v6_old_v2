@@ -20,7 +20,7 @@
 #define NB_MBUF (1024 * 8)
 #define MBUF_CACHE_SIZE 128
 
-static uint64_t timer_period = 10; /* default period is 10 seconds */
+static uint64_t timer_period = 1; /* default period is 1 second */
 
 static volatile bool force_quit;
 static uint32_t port_mask = 0;
@@ -33,11 +33,11 @@ struct rte_mempool *mbuf_pool;
 static void
 print_usage()
 {
-    printf("\npixelflut_v6_client [EAL options] -- -p PORTMASK\n"
+    printf("\npixelflut_v6 [EAL options] -- -p PORTMASK\n"
            "  -p PORTMASK: hexadecimal bitmask of ports to configure (for example 0x3 for the first 2 ports)\n"
            "  -c NUMBER: number of cores per port (default is 1)\n"
            "  -q NUMBER: number of queus per core (default is 1)\n"
-           "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 1 default, 86400 maximum)\n");
+           "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 1 default, %u maximum)\n", MAX_TIMER_PERIOD);
 }
 
 static inline void print_ether_addr(const char *what, struct ether_addr *eth_addr)
@@ -411,7 +411,7 @@ net_listen(int argc, char** argv, struct fb* fb, bool do_exit)
     /* parse application arguments (after the EAL ones) */
     ret = parse_args(argc, argv);
     if (ret < 0)
-        rte_exit(EXIT_FAILURE, "Invalid pixelflut_v6_client arguments\n");
+        rte_exit(EXIT_FAILURE, "Invalid pixelflut_v6 arguments\n");
 
     printf("DEBUG: port_mask: 0x%x\n", port_mask);
     printf("DEBUG: rx_cores_per_port: %u\n", rx_cores_per_port);
