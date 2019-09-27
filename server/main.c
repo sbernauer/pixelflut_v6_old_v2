@@ -373,11 +373,11 @@ int main(int argc, char** argv) {
 			    printf("Error opening file /etc/pixelflut_v6_statistics.txt\n");
 			    exit(1);
 			}
-			fprintf(f, "pixelflut_v6_packets: %llu\n", actualPacketsCounter);
-			fprintf(f, "pixelflut_v6_packets_missed: %llu\n", actualPacketsCounterMissed);
-			fprintf(f, "pixelflut_v6_packets_errors: %llu\n", actualPacketsCounterErrors);
-			fprintf(f, "pixelflut_v6_bytes: %llu\n",  actualBytesCounter);
-			fprintf(f, "pixelflut_v6_pixels: %llu\n",  fb->pixelCounter);
+			fprintf(f, "pixelflut_v6_packets %llu\n", actualPacketsCounter);
+			fprintf(f, "pixelflut_v6_packets_missed %llu\n", actualPacketsCounterMissed);
+			fprintf(f, "pixelflut_v6_packets_errors %llu\n", actualPacketsCounterErrors);
+			fprintf(f, "pixelflut_v6_bytes %llu\n",  actualBytesCounter);
+			fprintf(f, "pixelflut_v6_pixels %llu\n",  fb->pixelCounter);
 			fclose(f);
 
 			fpsSnapshot = after;
