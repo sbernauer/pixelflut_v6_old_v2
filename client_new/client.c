@@ -43,10 +43,10 @@ print_usage()
            "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 1 default, %u maximum)\n", MAX_TIMER_PERIOD);
 }
 
-static inline void print_ether_addr(const char *what, struct ether_addr *eth_addr)
+static inline void print_ether_addr(const char *what, struct rte_ether_addr *eth_addr)
 {
-    char buf[ETHER_ADDR_FMT_SIZE];
-    ether_format_addr(buf, ETHER_ADDR_FMT_SIZE, eth_addr);
+    char buf[RTE_ETHER_ADDR_FMT_SIZE];
+    rte_ether_format_addr(buf, RTE_ETHER_ADDR_FMT_SIZE, eth_addr);
     printf("%s%s", what, buf);
 }
 
@@ -203,7 +203,7 @@ static void init_port(unsigned int port_id) {
         .rxmode = {
             .split_hdr_size = 0,
             // .mq_mode = ETH_MQ_RX_RSS,
-            .max_rx_pkt_len = ETHER_MAX_LEN,
+            .max_rx_pkt_len = RTE_ETHER_MAX_LEN,
             // .offloads =
             //  DEV_RX_OFFLOAD_CHECKSUM    |
             //  DEV_RX_OFFLOAD_JUMBO_FRAME |
@@ -298,18 +298,18 @@ void *worker_thread(struct worker_thread_args *args) {
 
     uint32_t log_counter = 0;
 
-    struct ether_hdr *eth_hdr;
-    struct ipv6_hdr *ipv6_hdr;
+    struct rte_ether_hdr *eth_hdr;
+    struct rte_ipv6_hdr *ipv6_hdr;
 
-    struct ether_addr daddr;
-    daddr.addr_bytes[0] = 0x00;
-    daddr.addr_bytes[1] = 0x1b;
-    daddr.addr_bytes[2] = 0x21;
-    daddr.addr_bytes[3] = 0x8b;
-    daddr.addr_bytes[4] = 0xe5;
-    daddr.addr_bytes[5] = 0x18;
+    struct rte_ether_addr daddr;
+    daddr.addr_bytes[0] = 0x7c;
+    daddr.addr_bytes[1] = 0xfe;
+    daddr.addr_bytes[2] = 0x90;
+    daddr.addr_bytes[3] = 0x31;
+    daddr.addr_bytes[4] = 0x0d;
+    daddr.addr_bytes[5] = 0xd2;
 
-    struct ether_addr saddr;
+    struct rte_ether_addr saddr;
     saddr.addr_bytes[0] = 0x00;
     saddr.addr_bytes[1] = 0x1b;
     saddr.addr_bytes[2] = 0x21;
@@ -330,13 +330,13 @@ void *worker_thread(struct worker_thread_args *args) {
             printf("Allocation problem\n");
         }
         for(i  = 0; i < BURST_SIZE; i++) {
-            //eth_hdr = rte_pktmbuf_mtod(mbufs_transmit[i], struct ether_hdr *);
-            eth_hdr = (struct ether_hdr *)rte_pktmbuf_append(mbufs_transmit[i], sizeof(struct ether_hdr) + sizeof(struct ipv6_hdr) + 8); // TODO Maybe update: Added 8 bytes UDP payload
-            eth_hdr->ether_type = htons(ETHER_TYPE_IPv6);
-            rte_memcpy(&(eth_hdr->s_addr), &saddr, sizeof(struct ether_addr));
-            rte_memcpy(&(eth_hdr->d_addr), &daddr, sizeof(struct ether_addr));
+            //eth_hdr = rte_pktmbuf_mtod(mbufs_transmit[i], struct rte_ether_hdr *);
+            eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_append(mbufs_transmit[i], sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + 8); // TODO Maybe update: Added 8 bytes UDP payload
+            eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
+            rte_memcpy(&(eth_hdr->s_addr), &saddr, sizeof(struct rte_ether_addr));
+            rte_memcpy(&(eth_hdr->d_addr), &daddr, sizeof(struct rte_ether_addr));
 
-            ipv6_hdr = rte_pktmbuf_mtod_offset(mbufs_transmit[i], struct ipv6_hdr *, sizeof(struct ether_hdr));
+            ipv6_hdr = rte_pktmbuf_mtod_offset(mbufs_transmit[i], struct ipv6_hdr *, sizeof(struct rte_ether_hdr));
             ipv6_hdr->vtc_flow = htonl(6 << 28); // IP version 6
             ipv6_hdr->hop_limits = 0xff;
             ipv6_hdr->proto = 0x11; // UDP
@@ -514,7 +514,7 @@ main(int argc, char** argv)
     if (mbuf_pool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
-    struct ether_addr mac;
+    struct rte_ether_addr mac;
     RTE_ETH_FOREACH_DEV(port_id) {
         /* skip ports that are not enabled */
         if ((port_mask & (1 << port_id)) == 0)
